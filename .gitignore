@@ -1,2 +1,7 @@
 __pycache__
 .env
+
+
+# Added by cargo
+
+/target
