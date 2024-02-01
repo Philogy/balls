@@ -8,8 +8,8 @@ pub struct Swapper<'a, T: Eq> {
     incorrect_indices: Vec<usize>,
 }
 
-/// O(n^2) Iterator struct running over the O(n^2) algorithm to determine the optimal amount of
-/// swaps to transform a swapper to.
+/// Iterator struct running over the O(n^2) algorithm to determine the optimal amount of
+/// swaps to transform a given input stack ordering into an output ordering.
 impl<'a, T: Eq> Swapper<'a, T> {
     pub fn new(from: &'a mut Vec<T>, to: &'a Vec<T>) -> Self {
         // TODO: Remove panics and turn into result
