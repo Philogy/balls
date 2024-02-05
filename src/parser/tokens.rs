@@ -1,13 +1,13 @@
 use crate::parser::types::Ident;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
     // ============= Core =============
     Define,
     // ====== Top-level Keywords ======
     Op,
     Dependency,
-    Main,
+    Macro,
     // ========= Sub Keywords =========
     Stack,
     Reads,

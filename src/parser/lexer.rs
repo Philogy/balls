@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use num_bigint::BigUint;
 
-use crate::parser::{tokens::Token, utils::Spanned};
+use crate::parser::{tokens::Token, types::Spanned};
 
 fn text(
     literal: &'static str,
@@ -18,7 +18,7 @@ fn keyword(literal: &'static str, token: Token) -> impl Parser<char, Token, Erro
 fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
     keyword("op", Token::Op)
         .or(keyword("dependency", Token::Dependency))
-        .or(keyword("main", Token::Main))
+        .or(keyword("macro", Token::Macro))
         .or(keyword("stack", Token::Stack))
         .or(keyword("reads", Token::Reads))
         .or(keyword("writes", Token::Writes))
@@ -40,7 +40,7 @@ fn string_to_num<const BASE: u32>(s: String) -> Token {
     Token::Number(
         BigUint::parse_bytes(s.as_bytes(), BASE)
             .expect("Lexer should've ensured only valid bytes")
-            .to_bytes_be(),
+            .to_bytes_le(),
     )
 }
 
@@ -59,12 +59,12 @@ fn ident() -> impl Parser<char, Token, Error = Simple<char>> {
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| c.is_ascii_alphanumeric() || c == &'_').repeated(),
         )
-        .chain::<char, Option<_>, _>(filter(|c: &char| c == &'\'').or_not())
+        .chain::<char, Vec<_>, _>(filter(|c: &char| c == &'\'').repeated())
         .collect()
         .map(Token::Ident)
 }
 
-fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
+pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
     let comment = just("//")
         .then(take_until(text::newline()))
         .padded()
