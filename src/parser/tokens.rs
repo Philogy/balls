@@ -1,4 +1,5 @@
 use crate::parser::types::Ident;
+use num_bigint::BigUint;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -14,7 +15,7 @@ pub enum Token {
     Writes,
     // ============ Atoms =============
     Ident(Ident),
-    Number(Vec<u8>),
+    Number(BigUint),
     // =========== Symbols ============
     Arrow,
     OpenRound,
@@ -25,4 +26,19 @@ pub enum Token {
     CloseSquare,
     Comma,
     Assign,
+}
+
+impl Into<String> for Token {
+    fn into(self) -> String {
+        format!("{}", self)
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Number(num) => write!(f, "Number({:x})", num),
+            token => write!(f, "{:?}", token),
+        }
+    }
 }

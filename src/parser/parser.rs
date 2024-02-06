@@ -1,4 +1,5 @@
 use chumsky::prelude::*;
+use num_bigint::{BigUint, TryFromBigIntError};
 
 use crate::parser::{
     ast::{Ast, Expr, Macro, OpDefinition, Statement},
@@ -14,17 +15,22 @@ fn dependency_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     just(Token::Dependency).ignore_then(get_ident().map(Ast::Dependency))
 }
 
-fn le_bytes_to_u16(bytes: Vec<u8>) -> u16 {
-    match bytes.len() {
-        0 => 0,
-        1 => bytes[0] as u16,
-        2 => u16::from_le_bytes([bytes[0], bytes[1]]),
-        3.. => panic!("{:?} longer than 2 bytes", bytes),
-    }
-}
-
-fn number_to_u16() -> impl Parser<Token, u16, Error = Simple<Token>> {
-    select! { Token::Number(bytes) if bytes.len() <= 2 => le_bytes_to_u16(bytes) }
+fn stack_size() -> impl Parser<Token, u16, Error = Simple<Token>> {
+    select! { Token::Number(num) => num }.validate(|num, span, emit| match num.try_into() {
+        Ok(lol) => lol,
+        Err(err) => {
+            let err: TryFromBigIntError<BigUint> = err;
+            emit(Simple::custom(
+                span,
+                format!(
+                    "Number {} exceeds max valid stack size specifier (max: {})",
+                    err.into_original(),
+                    u16::MAX
+                ),
+            ));
+            u16::MAX
+        }
+    })
 }
 
 fn dependency_list(token: Token) -> impl Parser<Token, Vec<Ident>, Error = Simple<Token>> {
@@ -44,9 +50,9 @@ fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
         .then_ignore(just(Token::Assign));
 
     let stack_io = just(Token::Stack).ignore_then(
-        number_to_u16()
+        stack_size()
             .then_ignore(just(Token::Comma))
-            .then(number_to_u16())
+            .then(stack_size())
             .delimited_by(just(Token::OpenRound), just(Token::CloseRound)),
     );
 
@@ -65,29 +71,58 @@ fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     )
 }
 
-fn expression() -> impl Parser<Token, Expr, Error = Simple<Token>> {
+fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
     recursive(|expr| {
         let arg_list = expr
             .separated_by(just(Token::Comma))
             .delimited_by(just(Token::OpenRound), just(Token::CloseRound))
-            .map(Box::new);
+            .map(Box::new)
+            .map_with_span(Spanned::new);
         let call = get_ident()
+            .map_with_span(Spanned::new)
             .then(arg_list)
             .map(|(name, args)| Expr::Call { name, args });
-        let num = select! { Token::Number(bytes) => Expr::Num(bytes) };
+        let num = select! { Token::Number(num) => num }
+            .validate(|num, span, emit| {
+                if num.bits() <= 256 {
+                    num
+                } else {
+                    emit(Simple::custom(
+                        span,
+                        format!("Expression constant {:x} larger than 32-bytes", num),
+                    ));
+                    BigUint::from_bytes_le(&[0xff; 32])
+                }
+            })
+            .map(Expr::Num);
 
-        call.or(num).or(get_ident().map(Expr::Var))
+        let var = get_ident().map(Expr::Var);
+
+        call.or(num).or(var).map_with_span(Spanned::new)
     })
 }
 
 fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
     // my_var =
-    let var_assign = get_ident().then_ignore(just(Token::Assign)).or_not();
+    let var_assign = get_ident()
+        .then_ignore(just(Token::Assign))
+        .or_not()
+        .map_with_span(|maybe_var, span| maybe_var.map(|ident| Spanned::new(ident, span)));
 
     // sstore(caller(), add(sload(caller()), sub(0x34, x)))
+    // wow = lmao(x, d)
     var_assign
         .then(expression())
         .map(|(ident, expr)| Statement { ident, expr })
+        .validate(|stated, span, emit| {
+            if stated.ident.is_none() && !matches!(stated.expr.inner, Expr::Call { .. }) {
+                emit(Simple::custom(
+                    span,
+                    format!("Top-level expression not allowed"),
+                ))
+            }
+            stated
+        })
 }
 
 fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
@@ -139,13 +174,13 @@ pub fn parser() -> impl Parser<Token, Vec<Spanned<Ast>>, Error = Simple<Token>> 
         .ignore_then(
             dependency_definition()
                 .or(op_definition())
-                .or(macro_definition())
-                .map_with_span(Spanned::new),
+                .or(macro_definition()),
         )
+        .map_with_span(Spanned::new)
         .repeated()
         .then_ignore(end())
 }
 
-pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<Spanned<Ast>>, Vec<Simple<Token>>> {
-    parser().parse(tokens)
+pub fn parse_tokens(tokens: Vec<Token>) -> (Option<Vec<Spanned<Ast>>>, Vec<Simple<Token>>) {
+    parser().parse_recovery(tokens)
 }

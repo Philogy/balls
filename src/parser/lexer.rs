@@ -38,9 +38,7 @@ fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
 
 fn string_to_num<const BASE: u32>(s: String) -> Token {
     Token::Number(
-        BigUint::parse_bytes(s.as_bytes(), BASE)
-            .expect("Lexer should've ensured only valid bytes")
-            .to_bytes_le(),
+        BigUint::parse_bytes(s.as_bytes(), BASE).expect("Lexer should've ensured only valid bytes"),
     )
 }
 

@@ -4,13 +4,13 @@ pub type Ident = String;
 
 pub type Span = std::ops::Range<usize>;
 
-#[derive(Debug)]
-pub struct Spanned<T: Debug> {
+#[derive(Debug, Clone)]
+pub struct Spanned<T: Debug + Clone> {
     pub inner: T,
     pub span: Span,
 }
 
-impl<T: Debug> Spanned<T> {
+impl<T: Debug + Clone> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
         Spanned { inner, span }
     }
@@ -18,4 +18,8 @@ impl<T: Debug> Spanned<T> {
     pub fn get_text<'a>(&self, src: &'a str) -> &'a str {
         &src[self.span.clone()]
     }
+}
+
+pub fn resolve_span_span<T: Clone + Debug>(span_span: &Span, spans: &Vec<Spanned<T>>) -> Span {
+    spans[span_span.start].span.start..spans[span_span.end - 1].span.end
 }

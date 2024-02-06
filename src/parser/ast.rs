@@ -1,21 +1,25 @@
 use std::boxed::Box;
 
-use crate::parser::types::Ident;
+use crate::parser::types::{Ident, Spanned};
+use num_bigint::BigUint;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Expr {
-    Call { name: Ident, args: Box<Vec<Expr>> },
+    Call {
+        name: Spanned<Ident>,
+        args: Spanned<Box<Vec<Spanned<Expr>>>>,
+    },
     Var(Ident),
-    Num(Vec<u8>),
+    Num(BigUint),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Statement {
-    pub ident: Option<Ident>,
-    pub expr: Expr,
+    pub ident: Option<Spanned<Ident>>,
+    pub expr: Spanned<Expr>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct OpDefinition {
     pub name: Ident,
     pub stack_in: u16,
@@ -24,7 +28,7 @@ pub struct OpDefinition {
     pub writes: Vec<Ident>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Macro {
     pub name: Ident,
     pub inputs: Vec<Ident>,
@@ -32,7 +36,7 @@ pub struct Macro {
     pub body: Vec<Statement>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Ast {
     Macro(Macro),
     OpDef(OpDefinition),
