@@ -1,9 +1,5 @@
-use balls::parser::{
-    ast::{Ast, Macro},
-    error_printing::print_errors,
-    lexer, parser,
-    types::resolve_span_span,
-};
+use balls::ast_to_comp::{sort_ast_nodes, transform_macro, validate_and_extract_globals};
+use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 
 fn main() {
     let file_path = std::env::args().nth(1).unwrap();
@@ -26,28 +22,27 @@ fn main() {
     }
 
     if let Some(ast_nodes) = maybe_ast_nodes {
-        for node in ast_nodes {
-            println!();
-            match node.inner {
-                Ast::Macro(Macro {
-                    name,
-                    inputs,
-                    outputs,
-                    body,
-                }) => {
-                    println!("name: {:?}", name);
-                    println!("inputs: {:?}", inputs);
-                    println!("outputs: {:?}", outputs);
-                    println!("statements:");
-                    for statement in body {
-                        dbg!(statement);
-                    }
-                }
-                node => {
-                    println!("node: {:?}", node);
-                }
+        let (dependencies, ops, macros) = sort_ast_nodes(ast_nodes);
+        let (_, ops, macros) = validate_and_extract_globals(dependencies, ops, macros);
+
+        for macro_def in macros {
+            println!("Macro {:?}", macro_def.name);
+
+            let (_, nodes, output_nodes) = transform_macro(&ops, macro_def.clone());
+
+            println!("inputs:");
+
+            for (id, ident) in macro_def.inputs.iter().enumerate() {
+                println!("{}: {}", id, ident);
             }
-            println!("tokens: {:?}", &tokens[node.span]);
+
+            for (node, res) in nodes {
+                println!("\n");
+                println!("res: {:?}", res);
+                dbg!(node);
+            }
+
+            println!("output_nodes: {:?}", output_nodes);
         }
     }
 }
