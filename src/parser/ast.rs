@@ -41,4 +41,5 @@ pub enum Ast {
     Macro(Macro),
     OpDef(OpDefinition),
     Dependency(Ident),
+    Error,
 }

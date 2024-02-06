@@ -29,7 +29,7 @@ where
                         delimiter.fg(Color::Yellow)
                     ))
                     .with_label(
-                        Label::new((&file_path, span.clone()))
+                        Label::new((&file_path, token_span_resolver(&span)))
                             .with_message(format!(
                                 "Unclosed delimiter {}",
                                 delimiter.fg(Color::Yellow)

@@ -11,6 +11,15 @@ pub struct Spanned<T: Debug + Clone> {
 }
 
 impl<T: Debug + Clone> Spanned<T> {
+    pub fn map<F, U: Debug + Clone>(self, f: F) -> Spanned<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        Spanned::new(f(self.inner), self.span)
+    }
+}
+
+impl<T: Debug + Clone> Spanned<T> {
     pub fn new(inner: T, span: Span) -> Self {
         Spanned { inner, span }
     }

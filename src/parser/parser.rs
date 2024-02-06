@@ -44,31 +44,49 @@ fn dependency_list(token: Token) -> impl Parser<Token, Vec<Ident>, Error = Simpl
         .map(Option::unwrap_or_default)
 }
 
+fn recover_for_round_delimited<T>(
+    parser: impl Parser<Token, T, Error = Simple<Token>>,
+) -> impl Parser<Token, Result<T, ()>, Error = Simple<Token>> {
+    parser
+        .delimited_by(just(Token::OpenRound), just(Token::CloseRound))
+        .map(Ok)
+        .recover_with(nested_delimiters(
+            Token::OpenRound,
+            Token::CloseRound,
+            [
+                (Token::OpenSquare, Token::CloseSquare),
+                (Token::OpenCurly, Token::CloseCurly),
+            ],
+            |_| Err(()),
+        ))
+}
+
 fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     let op_def_head = just(Token::Op)
         .ignore_then(get_ident())
         .then_ignore(just(Token::Assign));
 
-    let stack_io = just(Token::Stack).ignore_then(
+    let stack_io = just(Token::Stack).ignore_then(recover_for_round_delimited(
         stack_size()
             .then_ignore(just(Token::Comma))
-            .then(stack_size())
-            .delimited_by(just(Token::OpenRound), just(Token::CloseRound)),
-    );
+            .then(stack_size()),
+    ));
 
     let reads_writes = dependency_list(Token::Reads).then(dependency_list(Token::Writes));
 
-    op_def_head.then(stack_io).then(reads_writes).map(
-        |((name, (stack_in, stack_out)), (reads, writes))| {
-            Ast::OpDef(OpDefinition {
+    op_def_head
+        .then(stack_io)
+        .then(reads_writes)
+        .map(|((name, stack_io), (reads, writes))| match stack_io {
+            Ok((stack_in, stack_out)) => Ast::OpDef(OpDefinition {
                 name,
                 stack_in,
                 stack_out,
                 reads,
                 writes,
-            })
-        },
-    )
+            }),
+            Err(()) => Ast::Error,
+        })
 }
 
 fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
