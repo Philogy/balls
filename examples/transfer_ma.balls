@@ -1,0 +1,54 @@
+// Single line comment.
+
+// Define dependency types
+#define dependency STORAGE
+#define dependency MEMORY
+#define dependency STOP
+
+// Constants
+#define op calldataload = stack(1, 1)
+#define op caller = stack(0, 1)
+
+// Pure ops
+#define op add = stack(2, 1)
+#define op sub = stack(2, 1)
+#define op gt = stack(2, 1)
+#define op or = stack(2, 1)
+
+// Memory ops
+#define op mstore = stack(2, 0) writes(MEMORY)
+
+// Storage
+#define op sload = stack(1, 1) reads(STOP) writes(STORAGE)
+#define op sstore = stack(2, 0) reads(STOP) writes(STORAGE)
+
+// Termination
+#define op return = stack(2, 0) reads(MEMORY) writes(STOP)
+#define op assertFalse = stack(1, 0) reads(STOP)
+
+// Define actual code
+#define macro TRANSFER<STOP, STORAGE> = [error] -> {
+    // Define some variables
+    from = caller()
+    to = calldataload(0x04)
+    amount = calldataload(0x24)
+
+    // Get from balance.
+    from_bal = sload(from)
+
+    // Check from balance and error.
+    insufficient_bal = gt(amount, from_bal)
+    error = or(error, insufficient_bal)
+    assertFalse(error)
+
+    // Update from balance.
+    sstore(from, sub(from_bal, amount))
+
+    // Update to balance.
+    to_bal = sload(to)
+    sstore(to, add(to_bal, amount))
+
+    // Return success (1).
+    mstore(0x00, 1)
+    return(0x00, 0x20)
+} -> []
