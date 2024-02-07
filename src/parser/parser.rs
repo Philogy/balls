@@ -44,22 +44,31 @@ fn dependency_list(token: Token) -> impl Parser<Token, Vec<Ident>, Error = Simpl
         .or_default()
 }
 
-fn recover_for_round_delimited<T>(
+fn recover_for_delimiters<T, const N: usize>(
+    open: Token,
+    close: Token,
+    other_delims: [(Token, Token); N],
     parser: impl Parser<Token, T, Error = Simple<Token>>,
 ) -> impl Parser<Token, Result<T, ()>, Error = Simple<Token>> {
     parser
-        .delimited_by(just(Token::OpenRound), just(Token::CloseRound))
+        .delimited_by(just(open.clone()), just(close.clone()))
         .map(Ok)
-        .recover_with(nested_delimiters(
-            Token::OpenRound,
-            Token::CloseRound,
-            [
-                (Token::OpenSquare, Token::CloseSquare),
-                (Token::OpenCurly, Token::CloseCurly),
-                (Token::OpenAngle, Token::CloseAngle),
-            ],
-            |_| Err(()),
-        ))
+        .recover_with(nested_delimiters(open, close, other_delims, |_| Err(())))
+}
+
+fn recover_for_round_delimited<T>(
+    parser: impl Parser<Token, T, Error = Simple<Token>>,
+) -> impl Parser<Token, Result<T, ()>, Error = Simple<Token>> {
+    recover_for_delimiters(
+        Token::OpenRound,
+        Token::CloseRound,
+        [
+            (Token::OpenSquare, Token::CloseSquare),
+            (Token::OpenCurly, Token::CloseCurly),
+            (Token::OpenAngle, Token::CloseAngle),
+        ],
+        parser,
+    )
 }
 
 fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
@@ -144,10 +153,23 @@ fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
         })
 }
 
+fn stack_parameters() -> impl Parser<Token, Vec<Ident>, Error = Simple<Token>> {
+    get_ident()
+        .list()
+        .delimited_by(just(Token::OpenSquare), just(Token::CloseSquare))
+}
+
 fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
-    // macro TRANSFER =
-    let macro_def_head = just(Token::Macro)
-        .ignore_then(get_ident())
+    // macro TRANSFER
+    let macro_def = just(Token::Macro).ignore_then(get_ident());
+
+    // <DEP1, DEP2> =
+    let top_level_deps = get_ident()
+        .map_with_span(Spanned::new)
+        .list()
+        .at_least(1)
+        .delimited_by(just(Token::OpenAngle), just(Token::CloseAngle))
+        .or_default()
         .then_ignore(just(Token::Assign));
 
     // [a, b, c]
@@ -167,13 +189,15 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
         .ignore_then(stack_parameters())
         .or_default();
 
-    macro_def_head
+    macro_def
+        .then(top_level_deps)
         .then(stack_in)
         .then(body)
         .then(stack_out)
-        .map(|(((name, inputs), body), outputs)| {
+        .map(|((((name, top_level_deps), inputs), body), outputs)| {
             Ast::Macro(Macro {
                 name,
+                top_level_deps,
                 inputs,
                 outputs,
                 body,

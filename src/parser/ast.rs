@@ -31,6 +31,7 @@ pub struct OpDefinition {
 #[derive(Clone, Debug)]
 pub struct Macro {
     pub name: Ident,
+    pub top_level_deps: Vec<Spanned<Ident>>,
     pub inputs: Vec<Ident>,
     pub outputs: Vec<Ident>,
     pub body: Vec<Statement>,
