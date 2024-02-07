@@ -1,3 +1,4 @@
+use super::utils::{OrDefaultParser, TokenParser};
 use chumsky::prelude::*;
 use num_bigint::{BigUint, TryFromBigIntError};
 
@@ -37,11 +38,10 @@ fn dependency_list(token: Token) -> impl Parser<Token, Vec<Ident>, Error = Simpl
     just(token)
         .ignore_then(
             get_ident()
-                .separated_by(just(Token::Comma))
+                .list()
                 .delimited_by(just(Token::OpenRound), just(Token::CloseRound)),
         )
-        .or_not()
-        .map(Option::unwrap_or_default)
+        .or_default()
 }
 
 fn recover_for_round_delimited<T>(
@@ -93,7 +93,7 @@ fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
 fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
     recursive(|expr| {
         let arg_list = expr
-            .separated_by(just(Token::Comma))
+            .list()
             .delimited_by(just(Token::OpenRound), just(Token::CloseRound))
             .map(Box::new)
             .map_with_span(Spanned::new);
@@ -151,17 +151,11 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
         .then_ignore(just(Token::Assign));
 
     // [a, b, c]
-    let stack_parameters = || {
-        get_ident()
-            .separated_by(just(Token::Comma))
-            .delimited_by(just(Token::OpenSquare), just(Token::CloseSquare))
-    };
 
     // [a, b, c] ->
     let stack_in = stack_parameters()
         .then_ignore(just(Token::Arrow))
-        .or_not()
-        .map(Option::unwrap_or_default);
+        .or_default();
 
     // { var1 = op(a, ...) ... sstore(x, y)  }
     let body = statement()
@@ -171,8 +165,7 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     // -> [result, nice]
     let stack_out = just(Token::Arrow)
         .ignore_then(stack_parameters())
-        .or_not()
-        .map(Option::unwrap_or_default);
+        .or_default();
 
     macro_def_head
         .then(stack_in)
