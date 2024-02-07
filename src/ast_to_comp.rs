@@ -308,13 +308,13 @@ fn map_expr(ctx: &mut SemanticContext, expr: &Expr) -> (usize, bool) {
             (id, has_output)
         }
         Expr::Var(ident) => {
-            let id = ctx
+            let id = *ctx
                 .get_ident(&ident)
                 .expect(format!("TODO: Variable {:?} not yet defined", &ident).as_str());
             let has_output = ctx
-                .get_has_output(*id)
+                .get_has_output(id)
                 .expect("get_ident returned invalid id");
-            (*id, has_output)
+            (id, has_output)
         }
         Expr::Num(num) => {
             let id = ctx.new_id();
@@ -330,20 +330,32 @@ fn map_expr(ctx: &mut SemanticContext, expr: &Expr) -> (usize, bool) {
 pub fn transform_macro(
     ops: &Vec<OpDefinition>,
     macro_def: Macro,
-) -> (CompNodeId, Vec<(CompNode, CompResult)>, Vec<CompNodeId>) {
+) -> (
+    CompNodeId,
+    Vec<(CompNode, CompResult)>,
+    Vec<CompNodeId>,
+    Vec<CompNodeId>,
+) {
     let mut ctx = SemanticContext::new(ops, macro_def.inputs);
 
-    for statement in macro_def.body {
-        let (id, has_output) = map_expr(&mut ctx, &statement.expr.inner);
-        assert_eq!(
-            has_output,
-            statement.ident.is_some(),
-            "TODO: The number of operation outputs must be equal to the variable assignemtns"
-        );
-        if let Some(ident) = statement.ident {
-            ctx.set_ident(ident.inner, id);
-        }
-    }
+    let statement_to_id: Vec<_> = macro_def
+        .body
+        .iter()
+        .map(|statement| {
+            let (id, has_output) = map_expr(&mut ctx, &statement.expr.inner);
+            assert_eq!(
+                has_output,
+                statement.ident.is_some(),
+                "TODO: The number of operation outputs must be equal to the variable assignemtns"
+            );
+            if let Some(ident) = &statement.ident {
+                let ident = ident.inner.clone();
+                ctx.set_ident(ident, id);
+            }
+
+            id
+        })
+        .collect();
 
     let output_nodes = macro_def
         .outputs
@@ -354,5 +366,19 @@ pub fn transform_macro(
         })
         .collect();
 
-    (ctx.first_comp_id, ctx.nodes, output_nodes)
+    for (id, statement) in statement_to_id.iter().zip(macro_def.body) {
+        if let CompGetResult::Some((node, res)) = ctx.get_comp_pair(*id) {
+            let count = node.blocked_by;
+            assert!(
+                count > 0,
+                "TODO: {:?} = {:?} unused. Only top-level inputs can remain unused. ({}) count: {}",
+                statement.ident,
+                res,
+                id,
+                count
+            );
+        }
+    }
+
+    (ctx.first_comp_id, ctx.nodes, output_nodes, statement_to_id)
 }

@@ -7,6 +7,7 @@ fn main() {
 
     let lex_out = lexer::lex(src.as_str());
 
+    // TODO: Proper lexer error handling
     let spanned_tokens = lex_out.unwrap();
 
     let tokens: Vec<_> = spanned_tokens.iter().map(|t| t.inner.clone()).collect();
@@ -28,7 +29,7 @@ fn main() {
         for macro_def in macros {
             println!("Macro {:?}", macro_def.name);
 
-            let (_, nodes, output_nodes) = transform_macro(&ops, macro_def.clone());
+            let (_, nodes, output_nodes, _) = transform_macro(&ops, macro_def.clone());
 
             println!("inputs:");
 
