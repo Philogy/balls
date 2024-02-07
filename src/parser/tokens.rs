@@ -24,6 +24,8 @@ pub enum Token {
     CloseCurly,
     OpenSquare,
     CloseSquare,
+    OpenAngle,
+    CloseAngle,
     Comma,
     Assign,
 }

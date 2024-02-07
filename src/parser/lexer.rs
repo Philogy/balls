@@ -32,6 +32,16 @@ fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
         .or(text("}", Token::CloseCurly, "close curly bracket"))
         .or(text("[", Token::OpenSquare, "open square bracket"))
         .or(text("]", Token::CloseSquare, "close square bracket"))
+        .or(text(
+            "<",
+            Token::OpenAngle,
+            "open angled bracket / less-than",
+        ))
+        .or(text(
+            ">",
+            Token::CloseAngle,
+            "closed angled bracket / greater-than",
+        ))
         .or(text(",", Token::Comma, "comma"))
         .or(text("=", Token::Assign, "assign"))
 }

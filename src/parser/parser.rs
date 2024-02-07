@@ -56,6 +56,7 @@ fn recover_for_round_delimited<T>(
             [
                 (Token::OpenSquare, Token::CloseSquare),
                 (Token::OpenCurly, Token::CloseCurly),
+                (Token::OpenAngle, Token::CloseAngle),
             ],
             |_| Err(()),
         ))
