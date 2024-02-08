@@ -131,14 +131,14 @@ fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
 }
 
 fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
-    // my_var =
+    // Parses "my_var ="
     let var_assign = get_ident()
         .then_ignore(just(Token::Assign))
         .or_not()
         .map_with_span(|maybe_var, span| maybe_var.map(|ident| Spanned::new(ident, span)));
 
-    // sstore(caller(), add(sload(caller()), sub(0x34, x)))
-    // wow = lmao(x, d)
+    // Parses "sstore(caller(), add(sload(caller()), x))" or
+    // "wow = lmao(x, d)"
     var_assign
         .then(expression())
         .map(|(ident, expr)| Statement { ident, expr })
@@ -164,7 +164,7 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     let macro_def = just(Token::Macro).ignore_then(get_ident());
 
     // <DEP1, DEP2> =
-    let top_level_deps = get_ident()
+    let top_level_reads = get_ident()
         .map_with_span(Spanned::new)
         .list()
         .at_least(1)
@@ -190,14 +190,14 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
         .or_default();
 
     macro_def
-        .then(top_level_deps)
+        .then(top_level_reads)
         .then(stack_in)
         .then(body)
         .then(stack_out)
-        .map(|((((name, top_level_deps), inputs), body), outputs)| {
+        .map(|((((name, top_level_reads), inputs), body), outputs)| {
             Ast::Macro(Macro {
                 name,
-                top_level_deps,
+                top_level_reads,
                 inputs,
                 outputs,
                 body,

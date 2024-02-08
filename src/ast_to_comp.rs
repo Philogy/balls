@@ -1,4 +1,4 @@
-use crate::comp_graph::{CompNode, CompNodeId, CompResult};
+use crate::comp_graph::{CompNode, CompNodeId, Computation};
 use crate::parser::ast::{Ast, Expr, Macro, OpDefinition};
 use crate::parser::types::{Ident, Spanned};
 use std::collections::{HashMap, HashSet};
@@ -130,7 +130,7 @@ struct SemanticContext<'a> {
     ops: &'a Vec<OpDefinition>,
     next_id: CompNodeId,
     first_comp_id: CompNodeId,
-    nodes: Vec<(CompNode, CompResult)>,
+    nodes: Vec<(CompNode, Computation)>,
     ident_to_id: HashMap<Ident, CompNodeId>,
     last_write: HashMap<Ident, CompNodeId>,
     last_reads: HashMap<Ident, Vec<CompNodeId>>,
@@ -180,7 +180,7 @@ impl<'a> SemanticContext<'a> {
     pub fn get_comp_pair_mut(
         &mut self,
         id: CompNodeId,
-    ) -> CompGetResult<&mut (CompNode, CompResult)> {
+    ) -> CompGetResult<&mut (CompNode, Computation)> {
         match id.checked_sub(self.first_comp_id) {
             Some(comp_idx) => match self.nodes.get_mut(comp_idx) {
                 Some(pair) => CompGetResult::Some(pair),
@@ -190,7 +190,7 @@ impl<'a> SemanticContext<'a> {
         }
     }
 
-    pub fn get_comp_pair(&self, id: CompNodeId) -> CompGetResult<&(CompNode, CompResult)> {
+    pub fn get_comp_pair(&self, id: CompNodeId) -> CompGetResult<&(CompNode, Computation)> {
         match id.checked_sub(self.first_comp_id) {
             Some(comp_idx) => match self.nodes.get(comp_idx) {
                 Some(pair) => CompGetResult::Some(pair),
@@ -232,12 +232,12 @@ impl<'a> SemanticContext<'a> {
     }
 
     pub fn record_write(&mut self, dependency: &Ident, id: CompNodeId) -> Vec<CompNodeId> {
-        let prev_reads = self
+        let mut prev_reads = self
             .last_reads
             .insert(dependency.clone(), Vec::new())
             .unwrap_or_default();
 
-        self.last_write.insert(dependency.clone(), id);
+        prev_reads.extend(self.last_write.insert(dependency.clone(), id));
 
         prev_reads
             .iter()
@@ -302,7 +302,7 @@ fn map_expr(ctx: &mut SemanticContext, expr: &Expr) -> (usize, bool) {
 
             ctx.nodes.push((
                 CompNode::new(id, has_output, arg_ids, post_ids),
-                CompResult::Op(op.name.clone()),
+                Computation::Op(op.name.clone()),
             ));
 
             (id, has_output)
@@ -320,33 +320,39 @@ fn map_expr(ctx: &mut SemanticContext, expr: &Expr) -> (usize, bool) {
             let id = ctx.new_id();
             ctx.nodes.push((
                 CompNode::new(id, true, vec![], vec![]),
-                CompResult::Const(num.clone()),
+                Computation::Const(num.clone()),
             ));
             (id, true)
         }
     }
 }
 
+pub struct TransformedMacro {
+    pub first_comp_id: CompNodeId,
+    pub nodes: Vec<(CompNode, Computation)>,
+    pub output_nodes: Vec<CompNodeId>,
+    pub statement_ids: Vec<CompNodeId>,
+}
+
 pub fn transform_macro(
+    dependencies: &Vec<Ident>,
     ops: &Vec<OpDefinition>,
     macro_def: Macro,
-) -> (
-    CompNodeId,
-    Vec<(CompNode, CompResult)>,
-    Vec<CompNodeId>,
-    Vec<CompNodeId>,
-) {
+) -> TransformedMacro {
+    // Assign IDs to inputs and validate uniqueness.
     let mut ctx = SemanticContext::new(ops, macro_def.inputs);
 
-    let statement_to_id: Vec<_> = macro_def
+    // Assign IDs to statements.
+    let statement_ids: Vec<_> = macro_def
         .body
         .iter()
         .map(|statement| {
+            // Convert nested expressions to nodes and assign IDs
             let (id, has_output) = map_expr(&mut ctx, &statement.expr.inner);
             assert_eq!(
                 has_output,
                 statement.ident.is_some(),
-                "TODO: The number of operation outputs must be equal to the variable assignemtns"
+                "TODO: The number of operation outputs must be equal to the variable assignments"
             );
             if let Some(ident) = &statement.ident {
                 let ident = ident.inner.clone();
@@ -357,28 +363,55 @@ pub fn transform_macro(
         })
         .collect();
 
+    // Validate outputs and retrieve their IDs.
     let output_nodes = macro_def
         .outputs
         .iter()
         .map(|output| {
-            *ctx.get_ident(output)
-                .expect(format!("TODO: Undefined ouput identifer {:?}", output).as_str())
+            let id = *ctx
+                .get_ident(output)
+                .expect(format!("TODO: Undefined ouput identifer {:?}", output).as_str());
+            ctx.inc_blocked_by_count(&id);
+            id
         })
         .collect();
 
-    for (id, statement) in statement_to_id.iter().zip(macro_def.body) {
+    let top_level_dependencies: Vec<CompNodeId> = macro_def
+        .top_level_reads
+        .into_iter()
+        .filter_map(|Spanned { inner: ident, .. }| {
+            dependencies
+                .iter()
+                .find(|dependency| **dependency == ident)
+                .expect(format!("TODO: Referencing nonexistent dependency {:?}", ident).as_str());
+            Some(*ctx.last_write.get(&ident)?)
+        })
+        .collect();
+
+    for (id, statement) in statement_ids.iter().zip(macro_def.body) {
         if let CompGetResult::Some((node, res)) = ctx.get_comp_pair(*id) {
             let count = node.blocked_by;
-            assert!(
-                count > 0,
-                "TODO: {:?} = {:?} unused. Only top-level inputs can remain unused. ({}) count: {}",
-                statement.ident,
-                res,
-                id,
-                count
-            );
+            if count == 0
+                && top_level_dependencies
+                    .iter()
+                    .position(|dep_id| dep_id == id)
+                    .is_none()
+            {
+                println!(
+                    "TODO_WARNING: {:?} = {:?} unused. Only top-level inputs can remain unused. ({}) count: {}",
+                    statement.ident,
+                    res,
+                    id,
+                    count
+                );
+            }
         }
     }
 
-    (ctx.first_comp_id, ctx.nodes, output_nodes, statement_to_id)
+    TransformedMacro {
+        first_comp_id: ctx.first_comp_id,
+        nodes: ctx.nodes,
+        output_nodes,
+        statement_ids,
+    }
 }

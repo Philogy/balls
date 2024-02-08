@@ -2,7 +2,7 @@ use crate::parser::types::Ident;
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CompResult {
+pub enum Computation {
     Op(Ident),
     Const(BigUint),
 }

@@ -24,12 +24,12 @@ fn main() {
 
     if let Some(ast_nodes) = maybe_ast_nodes {
         let (dependencies, ops, macros) = sort_ast_nodes(ast_nodes);
-        let (_, ops, macros) = validate_and_extract_globals(dependencies, ops, macros);
+        let (dependencies, ops, macros) = validate_and_extract_globals(dependencies, ops, macros);
 
         for macro_def in macros {
             println!("Macro {:?}", macro_def.name);
 
-            let (_, nodes, output_nodes, _) = transform_macro(&ops, macro_def.clone());
+            let transformed = transform_macro(&dependencies, &ops, macro_def.clone());
 
             println!("inputs:");
 
@@ -37,13 +37,13 @@ fn main() {
                 println!("{}: {}", id, ident);
             }
 
-            for (node, res) in nodes {
+            for (node, res) in transformed.nodes {
                 println!("\n");
                 println!("res: {:?}", res);
                 dbg!(node);
             }
 
-            println!("output_nodes: {:?}", output_nodes);
+            println!("output_nodes: {:?}", transformed.output_nodes);
         }
     }
 }
