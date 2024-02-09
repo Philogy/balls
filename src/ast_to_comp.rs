@@ -120,16 +120,9 @@ pub fn validate_and_extract_globals(
 
 const RESERVED_EMPTY_IDENTIFIER: &str = "_";
 
-enum CompGetResult<T> {
-    Some(T),
-    Input,
-    None,
-}
-
 struct SemanticContext<'a> {
     ops: &'a Vec<OpDefinition>,
     next_id: CompNodeId,
-    first_comp_id: CompNodeId,
     nodes: Vec<(CompNode, Computation)>,
     ident_to_id: HashMap<Ident, CompNodeId>,
     last_write: HashMap<Ident, CompNodeId>,
@@ -137,28 +130,15 @@ struct SemanticContext<'a> {
 }
 
 impl<'a> SemanticContext<'a> {
-    pub fn new(ops: &'a Vec<OpDefinition>, inputs: Vec<Ident>) -> Self {
-        let mut ctx = Self {
+    pub fn new(ops: &'a Vec<OpDefinition>) -> Self {
+        Self {
             ops,
             next_id: 0,
-            first_comp_id: 0, // placeholder
             nodes: Vec::new(),
             ident_to_id: HashMap::new(),
             last_write: HashMap::new(),
             last_reads: HashMap::new(),
-        };
-
-        for input in inputs {
-            let id = ctx.new_id();
-            match ctx.get_ident(&input) {
-                Some(_) => panic!("TODO: Duplicate input identifier {}", &input),
-                None => ctx.set_ident(input, id),
-            }
         }
-
-        ctx.first_comp_id = ctx.next_id;
-
-        ctx
     }
 
     pub fn new_id(&mut self) -> CompNodeId {
@@ -177,34 +157,10 @@ impl<'a> SemanticContext<'a> {
         self.ident_to_id.get(ident)
     }
 
-    pub fn get_comp_pair_mut(
-        &mut self,
-        id: CompNodeId,
-    ) -> CompGetResult<&mut (CompNode, Computation)> {
-        match id.checked_sub(self.first_comp_id) {
-            Some(comp_idx) => match self.nodes.get_mut(comp_idx) {
-                Some(pair) => CompGetResult::Some(pair),
-                None => CompGetResult::None,
-            },
-            None => CompGetResult::Input,
-        }
-    }
-
-    pub fn get_comp_pair(&self, id: CompNodeId) -> CompGetResult<&(CompNode, Computation)> {
-        match id.checked_sub(self.first_comp_id) {
-            Some(comp_idx) => match self.nodes.get(comp_idx) {
-                Some(pair) => CompGetResult::Some(pair),
-                None => CompGetResult::None,
-            },
-            None => CompGetResult::Input,
-        }
-    }
-
     pub fn get_has_output(&self, id: CompNodeId) -> Result<bool, String> {
-        match self.get_comp_pair(id) {
-            CompGetResult::Some((node, _)) => Ok(node.has_output),
-            CompGetResult::Input => Ok(true),
-            CompGetResult::None => Err(format!("Invalid comp id {}", id)),
+        match self.nodes.get(id) {
+            Some((node, _)) => Ok(node.has_output),
+            None => Err(format!("Invalid comp id {}", id)),
         }
     }
 
@@ -212,12 +168,13 @@ impl<'a> SemanticContext<'a> {
         self.ops.iter().filter(|op| &op.name == ident).next()
     }
 
+    /// Expect valid id.
     fn inc_blocked_by_count(&mut self, id: &CompNodeId) {
-        match self.get_comp_pair_mut(*id) {
-            CompGetResult::Some(pair) => pair.0.blocked_by += 1,
-            CompGetResult::Input => {}
-            CompGetResult::None => panic!("Expected valid comp id, got: {}", id),
-        }
+        let (node, _) = self
+            .nodes
+            .get_mut(*id)
+            .expect(format!("Expected valid comp id, got: {}", id).as_str());
+        node.blocked_by += 1;
     }
 
     pub fn record_read(&mut self, dependency: &Ident, id: CompNodeId) -> Option<CompNodeId> {
@@ -328,9 +285,8 @@ fn map_expr(ctx: &mut SemanticContext, expr: &Expr) -> (usize, bool) {
 }
 
 pub struct TransformedMacro {
-    pub first_comp_id: CompNodeId,
     pub nodes: Vec<(CompNode, Computation)>,
-    pub output_nodes: Vec<CompNodeId>,
+    pub output_ids: Vec<CompNodeId>,
     pub statement_ids: Vec<CompNodeId>,
 }
 
@@ -340,7 +296,29 @@ pub fn transform_macro(
     macro_def: Macro,
 ) -> TransformedMacro {
     // Assign IDs to inputs and validate uniqueness.
-    let mut ctx = SemanticContext::new(ops, macro_def.inputs);
+    let mut ctx = SemanticContext::new(ops);
+
+    // Verify that there are no duplicate input identifiers and create nodes.
+    macro_def
+        .inputs
+        .iter()
+        .enumerate()
+        .for_each(|(i, input_ident)| {
+            assert!(
+                !macro_def.inputs[(i + 1)..].contains(input_ident),
+                "TODO: Duplicate input identifier {}",
+                input_ident
+            );
+
+            let id = ctx.new_id();
+
+            ctx.set_ident(input_ident.clone(), id);
+
+            ctx.nodes.push((
+                CompNode::new(id, true, vec![], vec![]),
+                Computation::TopLevelInput(input_ident.clone()),
+            ));
+        });
 
     // Assign IDs to statements.
     let statement_ids: Vec<_> = macro_def
@@ -364,15 +342,12 @@ pub fn transform_macro(
         .collect();
 
     // Validate outputs and retrieve their IDs.
-    let output_nodes = macro_def
+    let output_ids: Vec<_> = macro_def
         .outputs
         .iter()
         .map(|output| {
-            let id = *ctx
-                .get_ident(output)
-                .expect(format!("TODO: Undefined ouput identifer {:?}", output).as_str());
-            ctx.inc_blocked_by_count(&id);
-            id
+            *ctx.get_ident(output)
+                .expect(format!("TODO: Undefined ouput identifer {:?}", output).as_str())
         })
         .collect();
 
@@ -389,29 +364,49 @@ pub fn transform_macro(
         .collect();
 
     for (id, statement) in statement_ids.iter().zip(macro_def.body) {
-        if let CompGetResult::Some((node, res)) = ctx.get_comp_pair(*id) {
-            let count = node.blocked_by;
-            if count == 0
-                && top_level_dependencies
-                    .iter()
-                    .position(|dep_id| dep_id == id)
-                    .is_none()
-            {
-                println!(
-                    "TODO_WARNING: {:?} = {:?} unused. Only top-level inputs can remain unused. ({}) count: {}",
-                    statement.ident,
-                    res,
-                    id,
-                    count
-                );
-            }
+        // Ids in statement_ids are expected to be valid.
+        let (node, res) = ctx.nodes.get(*id).unwrap();
+
+        let count = node.blocked_by;
+        if count == 0
+            && top_level_dependencies.iter().all(|dep_id| dep_id != id)
+            && output_ids.iter().all(|dep_id| dep_id != id)
+        {
+            println!(
+                "TODO_WARNING: {:?} = {:?} unused. Only top-level inputs can remain unused. ({}) count: {}",
+                statement.ident,
+                res,
+                id,
+                count
+            );
         }
     }
 
     TransformedMacro {
-        first_comp_id: ctx.first_comp_id,
         nodes: ctx.nodes,
-        output_nodes,
+        output_ids,
         statement_ids,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_empty() {
+        let macro_def = Macro {
+            name: "empty".into(),
+            top_level_reads: vec![],
+            inputs: vec![],
+            outputs: vec![],
+            body: vec![],
+        };
+
+        let transform = transform_macro(&vec![], &vec![], macro_def);
+
+        assert_eq!(transform.nodes, vec![]);
+        assert_eq!(transform.output_ids, vec![]);
+        assert_eq!(transform.statement_ids, vec![]);
     }
 }

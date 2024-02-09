@@ -43,7 +43,7 @@ fn main() {
                 dbg!(node);
             }
 
-            println!("output_nodes: {:?}", transformed.output_nodes);
+            println!("output_nodes: {:?}", transformed.output_ids);
         }
     }
 }
