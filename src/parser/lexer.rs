@@ -73,8 +73,12 @@ fn ident() -> impl Parser<char, Token, Error = Simple<char>> {
 }
 
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
-    let comment = just("//")
-        .then(take_until(text::newline()))
+    let single_line_comment = just("//").then(take_until(text::newline())).to(());
+
+    let multi_line_comment = just("/*").then(take_until(just("*/"))).to(());
+
+    let comment = single_line_comment
+        .or(multi_line_comment)
         .padded()
         .labelled("comment");
 
