@@ -1,5 +1,5 @@
 use crate::comp_graph::{CompNode, CompNodeId};
-use crate::schedulers::Step;
+use crate::scheduling::Step;
 use crate::transformer::TransformedMacro;
 use crate::Searchable;
 use std::rc::Rc;

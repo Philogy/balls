@@ -1,5 +1,5 @@
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
-use balls::schedulers::BackwardsMachine;
+use balls::scheduling::BackwardsMachine;
 use balls::transformer::GlobalContext;
 
 fn main() {
