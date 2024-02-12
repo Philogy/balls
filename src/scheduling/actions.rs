@@ -28,44 +28,36 @@ impl ActionIterator {
 
         let stack = machine.stack();
         let total_stack_el = stack.len();
+        let deepest_idx = total_stack_el.checked_sub(17).unwrap_or(0);
 
-        for i in 0..total_stack_el {
-            actions.extend((0..total_stack_el).filter_map(|j| {
-                if i == j {
-                    return None;
+        actions.extend((deepest_idx..total_stack_el).filter_map(|i| {
+            (deepest_idx..total_stack_el).find_map(|j| {
+                if i != j && stack[i] == stack[j] {
+                    Some(Action::Dedup(i, j))
+                } else {
+                    None
                 }
-                let id1 = stack[i];
-                let id2 = stack[j];
-                if id1 != id2 || machine.blocked_by(id1).unwrap_or(0) == 0 {
-                    return None;
-                }
-                // We know length is at least 2 because we have 2 distinct indices (i, j)
-                let last_idx = total_stack_el - 1;
-                // Skip, too deep.
-                if last_idx - i > 16 || last_idx - j > 16 {
-                    return None;
-                }
-                Some(Action::Dedup(i, j))
-            }));
-        }
-
-        actions.extend((0..machine.nodes.len()).filter_map(|id| {
-            if machine.blocked_by(id) != Some(0) {
-                return None;
-            }
-            if machine.nodes[id].has_output {
-                Some(Action::UndoComp(
-                    id,
-                    machine
-                        .stack()
-                        .iter()
-                        .index_of(&id)
-                        .expect("Not-done, 0 block comp not on stack???"),
-                ))
-            } else {
-                Some(Action::UndoEffect(id))
-            }
+            })
         }));
+
+        actions.extend(
+            (0..machine.nodes.len())
+                .filter(|id| machine.blocked_by(*id) == Some(0))
+                .map(|id| {
+                    if machine.nodes[id].has_output {
+                        Action::UndoComp(
+                            id,
+                            machine
+                                .stack()
+                                .iter()
+                                .index_of(&id)
+                                .expect("Not-done, 0 block comp not on stack???"),
+                        )
+                    } else {
+                        Action::UndoEffect(id)
+                    }
+                }),
+        );
 
         Self(actions.into_iter())
     }

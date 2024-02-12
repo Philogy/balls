@@ -125,14 +125,9 @@ impl BackwardsMachine {
             id
         );
         let top_idx = self.stack.len() - 1;
-        let (as_top_idx, other_idx) = if as_top_idx > other_idx {
-            (as_top_idx, other_idx)
-        } else {
-            (other_idx, as_top_idx)
-        };
         debug_assert!(
             as_top_idx <= top_idx,
-            "Dedup (at top) index out-of-bounds: {}",
+            "Dedup index out-of-bounds: {}",
             top_idx
         );
         debug_assert!(
@@ -141,6 +136,11 @@ impl BackwardsMachine {
             other_idx
         );
         let swap_depth = top_idx - as_top_idx;
+        debug_assert!(
+            swap_depth <= 16,
+            "Balls too deep (attempted to swap with depth: {})",
+            swap_depth
+        );
         if swap_depth > 0 {
             steps.push(Step::Swap(swap_depth));
             self.stack.swap(as_top_idx, top_idx);
