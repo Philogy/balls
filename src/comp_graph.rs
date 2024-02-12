@@ -1,7 +1,7 @@
 use crate::parser::types::Ident;
 use num_bigint::BigUint;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Computation {
     Op(Ident),
     Const(BigUint),
@@ -17,8 +17,6 @@ pub struct CompNode {
     pub operands: Vec<CompNodeId>,
     /// Non-operand dependencies
     pub post: Vec<CompNodeId>,
-    /// Number of dependencies (operand + non-operand) preceding this node.
-    pub blocked_by: usize,
 }
 
 impl CompNode {
@@ -33,7 +31,10 @@ impl CompNode {
             has_output,
             operands,
             post,
-            blocked_by: 0,
         }
+    }
+
+    pub fn lone(id: CompNodeId, has_output: bool) -> Self {
+        Self::new(id, has_output, vec![], vec![])
     }
 }

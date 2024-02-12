@@ -1,5 +1,6 @@
-use balls::ast_to_comp::{sort_ast_nodes, transform_macro, validate_and_extract_globals};
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
+use balls::schedulers::BackwardsMachine;
+use balls::transformer::GlobalContext;
 
 fn main() {
     let file_path = std::env::args().nth(1).unwrap();
@@ -23,27 +24,30 @@ fn main() {
     }
 
     if let Some(ast_nodes) = maybe_ast_nodes {
-        let (dependencies, ops, macros) = sort_ast_nodes(ast_nodes);
-        let (dependencies, ops, macros) = validate_and_extract_globals(dependencies, ops, macros);
+        let ctx = GlobalContext::from(ast_nodes);
 
-        for macro_def in macros {
+        for macro_def in ctx.macros.iter() {
             println!("Macro {:?}", macro_def.name);
 
-            let transformed = transform_macro(&dependencies, &ops, macro_def.clone());
+            let tmacro = ctx.transform(macro_def.clone());
 
-            println!("inputs:");
+            // println!("inputs:");
 
-            for (id, ident) in macro_def.inputs.iter().enumerate() {
-                println!("{}: {}", id, ident);
-            }
+            // for (id, ident) in macro_def.inputs.iter().enumerate() {
+            //     println!("{}: {}", id, ident);
+            // }
 
-            for (node, res) in transformed.nodes {
-                println!("\n");
-                println!("res: {:?}", res);
-                dbg!(node);
-            }
+            // for (node, res) in tmacro.nodes {
+            //     println!("\n");
+            //     println!("res: {:?}", res);
+            //     dbg!(node);
+            // }
 
-            println!("output_nodes: {:?}", transformed.output_ids);
+            // println!("output_nodes: {:?}", tmacro.output_ids);
+
+            let machine: BackwardsMachine = tmacro.into();
+
+            dbg!(machine);
         }
     }
 }
