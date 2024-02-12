@@ -1,6 +1,4 @@
 use crate::comp_graph::{CompNode, CompNodeId, Computation};
-use crate::schedulers::BackwardsMachine;
-use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct TransformedMacro {

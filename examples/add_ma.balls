@@ -1,8 +1,10 @@
+#define dependency STUFF
+
 #define op add = stack(2, 1)
 #define op sub = stack(2, 1)
-#define op pop = stack(1, 0)
+#define op pop = stack(1, 0) writes(STUFF)
 
-#define macro ADD = [x, y] -> {
+#define macro ADD<STUFF> = [x, y] -> {
     sum = add(y, x)
     out = add(sum, sum)
     pop(out)
