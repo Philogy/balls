@@ -43,10 +43,10 @@ pub trait AStarScheduler<A>
 where
     A: Iterator<Item = Action>,
 {
-    fn schedule(start: BackwardsMachine) -> Vec<Step> {
+    fn schedule(start: BackwardsMachine) -> (usize, u32, Vec<Step>) {
         let mut queue: BinaryHeap<ScheduleNode> = BinaryHeap::new();
         let mut explored: HashMap<BackwardsMachine, Explored> = HashMap::new();
-        let mut total = 0;
+        let mut total: usize = 0;
 
         let score = Self::remaining_distance_heuristic(&start);
         queue.push(ScheduleNode {
@@ -65,8 +65,7 @@ where
                     all_steps.extend(e.steps.clone().into_iter().rev());
                     state_key = &e.came_from;
                 }
-                println!("total: {}", total);
-                return all_steps;
+                return (total, node.cost, all_steps);
             }
             for action in Self::iter_actions(&node.state) {
                 let mut new_state = node.state.clone();

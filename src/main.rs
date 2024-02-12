@@ -36,7 +36,7 @@ fn main() {
 
             let machine: BackwardsMachine = tmacro.clone().into();
 
-            let steps = Dijkstra::schedule(machine);
+            let (total, cost, steps) = Dijkstra::schedule(machine);
 
             for step in steps {
                 let s = match step {
@@ -51,6 +51,8 @@ fn main() {
                 };
                 println!("{}", s);
             }
+            println!("total: {total}");
+            println!("cost: {cost}");
         }
     }
 }
