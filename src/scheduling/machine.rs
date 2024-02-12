@@ -1,65 +1,49 @@
 use crate::comp_graph::{CompNode, CompNodeId};
+use crate::scheduling::actions::Action;
 use crate::scheduling::Step;
 use crate::transformer::TransformedMacro;
 use crate::Searchable;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Action {
-    Unpop(CompNodeId),
-    Dedup(CompNodeId, usize),
-    UndoEffect(CompNodeId),
-    UndoComp(usize, usize),
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackwardsMachine {
-    nodes: Rc<[CompNode]>,
-    target_input_stack: Rc<[CompNodeId]>,
-    stack: Vec<CompNodeId>,
-    /// Executed steps (in undone order).
-    steps: Vec<Step>,
+    pub nodes: Rc<[CompNode]>,
+    pub target_input_stack: Rc<[CompNodeId]>,
+    pub stack: Vec<CompNodeId>,
     /// Amount of post dependencies and dependent contracts before the given node can be marked as
     /// "done".
-    blocked_by: Vec<u32>,
-    done: Vec<bool>,
+    pub blocked_by: Vec<Option<u32>>,
 }
 
 impl BackwardsMachine {
-    pub fn is_on_stack(&self, id: CompNodeId) -> bool {
-        self.stack.iter().contains(&id)
+    pub fn all_done(&self) -> bool {
+        self.blocked_by.iter().all(|b| b.is_none())
     }
 
-    pub fn is_input(&self, id: CompNodeId) -> bool {
-        self.target_input_stack.iter().contains(&id)
+    pub fn blocked_by(&self, id: CompNodeId) -> Option<u32> {
+        self.blocked_by[id]
     }
 
-    pub fn can_undo(&self, id: CompNodeId) -> bool {
-        if self.done[id] || self.blocked_by[id] > 0 {
-            false
-        } else if !self.nodes[id].has_output {
-            true
-        } else {
-            !self.is_input(id)
-        }
+    pub fn stack(&self) -> &Vec<CompNodeId> {
+        &self.stack
     }
 
-    pub fn apply<'b>(&mut self, action: Action) {
+    pub fn apply<'b>(&mut self, action: Action, steps: &mut Vec<Step>) {
         match action {
-            Action::Unpop(id) => self.unpop(id),
-            Action::UndoComp(id, stack_idx) => self.undo_comp(id, stack_idx),
-            Action::UndoEffect(id) => self.undo_effect(id),
-            Action::Dedup(as_top_idx, other_idx) => self.dedup(as_top_idx, other_idx),
+            Action::Unpop(id) => self.unpop(id, steps),
+            Action::UndoComp(id, stack_idx) => self.undo_comp(id, stack_idx, steps),
+            Action::UndoEffect(id) => self.undo_effect(id, steps),
+            Action::Dedup(as_top_idx, other_idx) => self.dedup(as_top_idx, other_idx, steps),
         }
     }
 
-    fn unpop(&mut self, id: CompNodeId) {
+    fn unpop(&mut self, id: CompNodeId, steps: &mut Vec<Step>) {
         debug_assert_eq!(
-            self.blocked_by[id], 0,
-            "Unpopping blocked element (id: {})",
+            self.blocked_by[id],
+            Some(0),
+            "Unpopping blocked/done element (id: {})",
             id
         );
-        debug_assert!(!self.done[id], "Unpopping done element (id: {})", id);
         debug_assert!(
             self.target_input_stack.contains(&id),
             "Unpopping element not in input stack (id: {})",
@@ -67,16 +51,21 @@ impl BackwardsMachine {
         );
         // One unpop is sufficient to guarantee being done because every input stack element is
         // expected to be unique.
-        self.done[id] = true;
+        self.blocked_by[id] = None;
         self.stack.push(id);
-        self.steps.push(Step::Pop);
+
+        steps.push(Step::Pop);
     }
 
-    fn undo_comp(&mut self, id: CompNodeId, stack_idx: usize) {
+    fn undo_comp(&mut self, id: CompNodeId, stack_idx: usize, steps: &mut Vec<Step>) {
         // Check that we're actually able to undo.
-        debug_assert_eq!(self.blocked_by[id], 0, "Undoing blocked element {}", id);
-        debug_assert!(!self.done[id], "Unpopping done element {}", id);
-        self.done[id] = true;
+        debug_assert_eq!(
+            self.blocked_by[id],
+            Some(0),
+            "Undoing blocked/done element {}",
+            id
+        );
+        self.blocked_by[id] = None;
 
         let last_stack_idx = self.stack.len() - 1;
         debug_assert!(
@@ -95,25 +84,30 @@ impl BackwardsMachine {
         );
 
         if depth > 0 {
-            self.steps.push(Step::Swap(depth));
+            steps.push(Step::Swap(depth));
         }
-
         self._undo_node(id);
+        steps.push(Step::Op(id));
     }
 
-    fn undo_effect(&mut self, id: CompNodeId) {
+    fn undo_effect(&mut self, id: CompNodeId, steps: &mut Vec<Step>) {
         debug_assert!(
             !self.nodes[id].has_output,
             "Attempting to undo node as effect which has output (id: {})",
             id
         );
-        debug_assert_eq!(self.blocked_by[id], 0, "Undoing blocked element {}", id);
-        debug_assert!(!self.done[id], "Unpopping done element {}", id);
-        self.done[id] = true;
+        debug_assert_eq!(
+            self.blocked_by[id],
+            Some(0),
+            "Undoing blocked/done element {}",
+            id
+        );
+        self.blocked_by[id] = None;
         self._undo_node(id);
+        steps.push(Step::Op(id));
     }
 
-    fn dedup(&mut self, as_top_idx: usize, other_idx: usize) {
+    fn dedup(&mut self, as_top_idx: usize, other_idx: usize, steps: &mut Vec<Step>) {
         debug_assert!(
             as_top_idx != other_idx,
             "Duplicate indices for dedup (idx: {})",
@@ -125,10 +119,9 @@ impl BackwardsMachine {
             "IDs at indices don't match ([{}], [{}] -> {} vs. {})",
             as_top_idx, other_idx, id, self.stack[other_idx]
         );
-        debug_assert!(!self.done[id], "Deduping done element (id: {})", id);
         debug_assert!(
-            self.blocked_by[id] > 0,
-            "Deduping element with no blocks (id: {})",
+            self.blocked_by[id].unwrap_or(0) > 0,
+            "Deduping element with no blocks/done (id: {})",
             id
         );
         let top_idx = self.stack.len() - 1;
@@ -149,7 +142,7 @@ impl BackwardsMachine {
         );
         let swap_depth = top_idx - as_top_idx;
         if swap_depth > 0 {
-            self.steps.push(Step::Swap(swap_depth));
+            steps.push(Step::Swap(swap_depth));
             self.stack.swap(as_top_idx, top_idx);
         }
         let dedup_depth = top_idx - other_idx;
@@ -158,23 +151,42 @@ impl BackwardsMachine {
             "Balls too deep (attempted to dedup with depth: {})",
             dedup_depth
         );
-        self.steps.push(Step::Dup(dedup_depth));
+        self.blocked_by[id].as_mut().map(|b| *b -= 1);
+        steps.push(Step::Dup(dedup_depth));
         self.stack.pop();
+        if self.blocked_by[id].unwrap() == 0 && self.target_input_stack.contains(&id) {
+            debug_assert_eq!(
+                self.stack.iter().total(&id),
+                1,
+                "stack: {:?}, id: {}, ({}, {})",
+                &self.stack,
+                id,
+                as_top_idx,
+                other_idx
+            );
+            self.blocked_by[id] = None;
+        }
     }
 
     fn _undo_node(&mut self, id: CompNodeId) {
-        self.steps.push(Step::Op(id));
         for dep_id in self.nodes[id].operands.iter().rev() {
             self.stack.push(*dep_id);
-            self.blocked_by[*dep_id] -= 1;
-            if self.blocked_by[*dep_id] == 0 && self.target_input_stack.contains(dep_id) {
+            self.blocked_by[*dep_id].as_mut().map(|b| *b -= 1);
+            if self.blocked_by[*dep_id].unwrap() == 0 && self.target_input_stack.contains(dep_id) {
                 debug_assert_eq!(self.stack.iter().total(dep_id), 1);
-                self.done[*dep_id] = true;
+                self.blocked_by[*dep_id] = None;
             }
         }
         for pre_id in self.nodes[id].post.iter() {
-            self.blocked_by[*pre_id] -= 1;
+            self.blocked_by[*pre_id].as_mut().map(|b| *b -= 1);
         }
+    }
+}
+
+impl std::hash::Hash for BackwardsMachine {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.stack.hash(state);
+        self.blocked_by.hash(state);
     }
 }
 
@@ -209,7 +221,7 @@ impl From<TransformedMacro> for BackwardsMachine {
             blocked_by[id] += required_dedups;
         }
 
-        let done = (0..nodes.len())
+        let blocked_by = (0..nodes.len())
             .map(|id| {
                 let input_count = target_input_stack.iter().total(&id);
                 let already_done = blocked_by[id] == 0
@@ -220,7 +232,11 @@ impl From<TransformedMacro> for BackwardsMachine {
                     println!("TODO: Warning skipping scheduling for unused node {}", id);
                 }
 
-                already_done
+                if already_done {
+                    None
+                } else {
+                    Some(blocked_by[id])
+                }
             })
             .collect();
 
@@ -228,9 +244,7 @@ impl From<TransformedMacro> for BackwardsMachine {
             nodes,
             target_input_stack,
             stack,
-            steps: vec![],
             blocked_by,
-            done,
         }
     }
 }
@@ -250,14 +264,12 @@ mod test {
             ]),
             target_input_stack: Rc::from([2, 1, 0]),
             stack: vec![3],
-            steps: vec![],
-            blocked_by: vec![1, 1, 0, 0],
-            done: vec![false; 4],
+            blocked_by: vec![Some(1), Some(1), Some(0), Some(0)],
         };
 
         dbg!(&machine);
 
-        machine.apply(Action::Unpop(2));
+        machine.apply(Action::Unpop(2), &mut vec![]);
 
         dbg!(&machine);
     }
@@ -273,14 +285,12 @@ mod test {
             ]),
             target_input_stack: Rc::from([2, 1, 0]),
             stack: vec![2, 3],
-            steps: vec![],
-            blocked_by: vec![1, 1, 0, 0],
-            done: vec![false, false, true, false],
+            blocked_by: vec![Some(1), Some(1), Some(0), Some(0)],
         };
 
         dbg!(&machine);
 
-        machine.apply(Action::UndoComp(3, 1));
+        machine.apply(Action::UndoComp(3, 1), &mut vec![]);
 
         dbg!(&machine);
     }

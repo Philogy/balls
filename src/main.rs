@@ -1,5 +1,8 @@
+use balls::comp_graph::Computation;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
-use balls::scheduling::BackwardsMachine;
+use balls::scheduling::astar::AStarScheduler;
+use balls::scheduling::dijkstra::Dijkstra;
+use balls::scheduling::{BackwardsMachine, Step};
 use balls::transformer::GlobalContext;
 
 fn main() {
@@ -31,23 +34,23 @@ fn main() {
 
             let tmacro = ctx.transform(macro_def.clone());
 
-            // println!("inputs:");
+            let machine: BackwardsMachine = tmacro.clone().into();
 
-            // for (id, ident) in macro_def.inputs.iter().enumerate() {
-            //     println!("{}: {}", id, ident);
-            // }
+            let steps = Dijkstra::schedule(machine);
 
-            // for (node, res) in tmacro.nodes {
-            //     println!("\n");
-            //     println!("res: {:?}", res);
-            //     dbg!(node);
-            // }
-
-            // println!("output_nodes: {:?}", tmacro.output_ids);
-
-            let machine: BackwardsMachine = tmacro.into();
-
-            dbg!(machine);
+            for step in steps {
+                let s = match step {
+                    Step::Op(id) => match &tmacro.nodes[id].1 {
+                        Computation::Op(ident) => ident.clone(),
+                        Computation::TopLevelInput(ident) => ident.clone(),
+                        Computation::Const(num) => format!("0x{:x}", num),
+                    },
+                    Step::Dup(depth) => format!("dup{}", depth),
+                    Step::Swap(depth) => format!("swap{}", depth),
+                    Step::Pop => "pop".to_string(),
+                };
+                println!("{}", s);
+            }
         }
     }
 }

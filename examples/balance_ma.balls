@@ -15,7 +15,10 @@
 #define op gt = stack(2, 1)
 #define op or = stack(2, 1)
 
+#define op returndatasize = stack(0, 1)
+
 // Memory ops
+#define op msize = stack(0, 1) reads(MEMORY)
 #define op mstore = stack(2, 0) writes(MEMORY)
 #define op sha3 = stack(2, 1) reads(MEMORY)
 
@@ -27,9 +30,12 @@
 #define op return = stack(2, 0) reads(MEMORY) writes(STOP)
 #define op assertFalse = stack(1, 0) reads(STOP)
 
-#define macro BALANCE = [slot, clean_addr] -> {
-    mstore(0x00, slot)
-    mstore(0x20, clean_addr)
-    bal_slot = sha3(0x00, 0x40)
-    balance = sload(bal_slot)
-} -> [balance]
+#define macro BALANCE<STOP> = [error] -> {
+    assertFalse(error)
+
+    addr = calldataload(0x04)
+    bal = sload(addr)
+
+    mstore(msize(), bal)
+    return(returndatasize(), msize())
+} -> []

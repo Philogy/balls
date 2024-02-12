@@ -1,17 +1,17 @@
-use std::fmt;
 use std::fmt::Debug;
 use std::iter::zip;
 
+#[derive(Debug)]
 pub struct Swapper<'a, T: Eq> {
     from: &'a mut Vec<T>,
-    to: &'a Vec<T>,
+    to: &'a [T],
     incorrect_indices: Vec<usize>,
 }
 
 /// Iterator struct running over the O(n^2) algorithm to determine the optimal amount of
 /// swaps to transform a given input stack ordering into an output ordering.
 impl<'a, T: Eq> Swapper<'a, T> {
-    pub fn new(from: &'a mut Vec<T>, to: &'a Vec<T>) -> Self {
+    pub fn new(from: &'a mut Vec<T>, to: &'a [T]) -> Self {
         // TODO: Remove panics and turn into result
         if from.len() != to.len() {
             panic!("length mismatch");
@@ -62,8 +62,20 @@ impl<'a, T: Eq> Swapper<'a, T> {
             Some(_) => None,
         }
     }
+
+    pub fn get_swaps(&mut self) -> Result<Vec<usize>, &str> {
+        let mut swaps = vec![];
+        while let Some(depth) = self.next() {
+            if depth > 16 {
+                return Err("Swap required too deep");
+            }
+            swaps.push(depth);
+        }
+        Ok(swaps)
+    }
 }
 
+/// Iterators that returns swaps (by depth) to transform one into another.
 impl<T: Eq> Iterator for Swapper<'_, T> {
     type Item = usize;
 
@@ -82,16 +94,6 @@ impl<T: Eq> Iterator for Swapper<'_, T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let total_incorrect = self.incorrect_indices.len();
         (total_incorrect, Some(total_incorrect * 2))
-    }
-}
-
-impl<T: Debug + Eq> Debug for Swapper<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Swapper")
-            .field("from", self.from)
-            .field("to", self.to)
-            .field("incorrect_indices", &self.incorrect_indices)
-            .finish()
     }
 }
 

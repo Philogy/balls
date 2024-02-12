@@ -4,8 +4,7 @@
 #define op sub = stack(2, 1)
 #define op pop = stack(1, 0) writes(STUFF)
 
-#define macro ADD<STUFF> = [x, y] -> {
-    sum = add(y, x)
+#define macro ADD<STUFF> = [y, x] -> {
+    sum = add(x, y)
     out = add(sum, sum)
-    pop(out)
-} -> [out, out]
+} -> [out]
