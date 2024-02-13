@@ -20,10 +20,6 @@ impl BackwardsMachine {
         self.blocked_by.iter().all(|b| b.is_none())
     }
 
-    pub fn blocked_by(&self, id: CompNodeId) -> Option<u32> {
-        self.blocked_by[id]
-    }
-
     pub fn stack(&self) -> &Vec<CompNodeId> {
         &self.stack
     }

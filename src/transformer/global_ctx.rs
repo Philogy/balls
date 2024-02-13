@@ -159,7 +159,8 @@ impl GlobalContext {
                 assert_eq!(
                     has_output,
                     statement.ident.is_some(),
-                    "TODO: The number of operation outputs must be equal to the variable assignments"
+                    "TODO: The number of operation outputs must be equal to the variable assignments ({:?} =)",
+                    statement.ident
                 );
 
 

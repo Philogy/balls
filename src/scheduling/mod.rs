@@ -1,7 +1,7 @@
 pub mod actions;
 pub mod astar;
-pub mod dijkstra;
 pub mod machine;
+pub mod schedulers;
 pub mod step;
 pub mod swap;
 

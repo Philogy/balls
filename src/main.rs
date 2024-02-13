@@ -1,7 +1,7 @@
 use balls::comp_graph::Computation;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
-use balls::scheduling::dijkstra::Dijkstra;
+use balls::scheduling::schedulers::{Dijkstra, Guessooor};
 use balls::scheduling::{BackwardsMachine, Step};
 use balls::transformer::GlobalContext;
 use std::time::Instant;
@@ -42,7 +42,8 @@ fn main() {
         let preprocessing_time = start.elapsed().as_micros() as f64 / 1000.0;
 
         let start = Instant::now();
-        let (total, cost, steps) = Dijkstra::schedule(machine);
+        let mut algo = Guessooor(0.06);
+        let (total, cost, steps) = algo.schedule(machine);
         let schedule_time = start.elapsed().as_secs_f64();
 
         for step in steps {
@@ -64,7 +65,11 @@ fn main() {
         }
         println!("Lexing + parsing: {:.2} ms", parse_lex_time);
         println!("Macro pre-processing: {:.2} ms", preprocessing_time);
-        println!("\nScheduling: {:.3} s", schedule_time);
+        if schedule_time < 0.25 {
+            println!("\nScheduling: {:.1} ms", schedule_time * 1000.0);
+        } else {
+            println!("\nScheduling: {:.3} s", schedule_time);
+        }
         println!(
             "explored: {} ({:.0} / s)",
             total,

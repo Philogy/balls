@@ -22,7 +22,7 @@ impl ActionIterator {
                 .target_input_stack
                 .iter()
                 .map(|id| *id)
-                .filter(|id| machine.blocked_by(*id) == Some(0))
+                .filter(|id| machine.blocked_by[*id] == Some(0))
                 .map(Action::Unpop),
         );
 
@@ -40,24 +40,25 @@ impl ActionIterator {
             })
         }));
 
-        actions.extend(
-            (0..machine.nodes.len())
-                .filter(|id| machine.blocked_by(*id) == Some(0))
-                .map(|id| {
-                    if machine.nodes[id].has_output {
-                        Action::UndoComp(
-                            id,
-                            machine
-                                .stack()
-                                .iter()
-                                .index_of(&id)
-                                .expect("Not-done, 0 block comp not on stack???"),
-                        )
-                    } else {
-                        Action::UndoEffect(id)
-                    }
-                }),
-        );
+        actions.extend((0..machine.nodes.len()).filter_map(|id| {
+            if machine.blocked_by[id] != Some(0) {
+                return None;
+            }
+            if machine.nodes[id].has_output {
+                let idx = machine
+                    .stack()
+                    .iter()
+                    .index_of(&id)
+                    .expect("Not-done, 0 block comp not on stack???");
+                if idx < deepest_idx {
+                    None
+                } else {
+                    Some(Action::UndoComp(id, idx))
+                }
+            } else {
+                Some(Action::UndoEffect(id))
+            }
+        }));
 
         Self(actions.into_iter())
     }
