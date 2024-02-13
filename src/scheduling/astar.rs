@@ -1,10 +1,9 @@
 use super::actions::{Action, ActionIterator};
 use crate::scheduling::swap::Swapper;
 use crate::scheduling::{BackwardsMachine, Step};
-use fxhash::FxHasher64;
 use std::collections::{BinaryHeap, HashMap};
-use std::hash::BuildHasherDefault;
 use std::time::Instant;
+use xxhash_rust::xxh3::Xxh3Builder;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ScheduleNode {
@@ -48,8 +47,9 @@ where
 {
     fn schedule(&mut self, start: BackwardsMachine) -> (usize, u32, Vec<Step>) {
         let mut queue: BinaryHeap<ScheduleNode> = BinaryHeap::new();
-        let mut explored: HashMap<BackwardsMachine, Explored, BuildHasherDefault<FxHasher64>> =
-            HashMap::default();
+        let total_nodes = start.nodes.len();
+        let mut explored: HashMap<BackwardsMachine, Explored, Xxh3Builder> =
+            HashMap::with_capacity_and_hasher(total_nodes * total_nodes * 300, Xxh3Builder::new());
         let mut total: usize = 0;
         let mut last_total: usize = 0;
         let mut time = Instant::now();

@@ -8,8 +8,12 @@ edition = "2021"
 [dependencies]
 ariadne = "0.4.0"
 chumsky = "0.9.3"
-fxhash = "0.2.1"
 num-bigint = "0.4.4"
+
+
+[dependencies.xxhash-rust]
+version = "0.8.8"
+features = ["xxh3", "const_xxh3"]
 
 [lib]
 path = "src/lib.rs"
