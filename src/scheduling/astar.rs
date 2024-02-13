@@ -1,7 +1,9 @@
 use super::actions::{Action, ActionIterator};
 use crate::scheduling::swap::Swapper;
 use crate::scheduling::{BackwardsMachine, Step};
+use fxhash::FxHasher64;
 use std::collections::{BinaryHeap, HashMap};
+use std::hash::BuildHasherDefault;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -46,7 +48,8 @@ where
 {
     fn schedule(&mut self, start: BackwardsMachine) -> (usize, u32, Vec<Step>) {
         let mut queue: BinaryHeap<ScheduleNode> = BinaryHeap::new();
-        let mut explored: HashMap<BackwardsMachine, Explored> = HashMap::new();
+        let mut explored: HashMap<BackwardsMachine, Explored, BuildHasherDefault<FxHasher64>> =
+            HashMap::default();
         let mut total: usize = 0;
         let mut last_total: usize = 0;
         let mut time = Instant::now();

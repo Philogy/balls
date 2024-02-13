@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ariadne = "0.4.0"
 chumsky = "0.9.3"
+fxhash = "0.2.1"
 num-bigint = "0.4.4"
 
 [lib]
