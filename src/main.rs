@@ -1,7 +1,7 @@
 use balls::comp_graph::Computation;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
-use balls::scheduling::schedulers::{Dijkstra, Guessooor};
+use balls::scheduling::schedulers::Guessooor;
 use balls::scheduling::{BackwardsMachine, Step};
 use balls::transformer::GlobalContext;
 use std::time::Instant;
@@ -42,8 +42,7 @@ fn main() {
         let preprocessing_time = start.elapsed().as_micros() as f64 / 1000.0;
 
         let start = Instant::now();
-        let mut algo = Guessooor(0.06);
-        let (total, cost, steps) = algo.schedule(machine);
+        let (steps, (cost, total, capacity_est)) = Guessooor::new(0.035).schedule(machine);
         let schedule_time = start.elapsed().as_secs_f64();
 
         for step in steps {
@@ -76,5 +75,26 @@ fn main() {
             total as f64 / schedule_time
         );
         println!("cost: {}", cost);
+        if capacity_est < 0.0 {
+            let factor_off = 1.0 / (capacity_est + 1.0);
+            if factor_off >= 3.0 {
+                println!("Underestimated explored nodes by: {:.2}x", factor_off);
+            } else {
+                println!(
+                    "Underestimated explored nodes by: {:.2}%",
+                    capacity_est * -100.0
+                );
+            }
+        } else {
+            let factor_off = capacity_est + 1.0;
+            if factor_off >= 3.0 {
+                println!("Overestimated explored nodes by: {:.2}x", factor_off);
+            } else {
+                println!(
+                    "Overestimated explored nodes by: {:.2}%",
+                    capacity_est * 100.0
+                );
+            }
+        }
     }
 }
