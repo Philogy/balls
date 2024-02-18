@@ -1,6 +1,6 @@
 use super::actions::{Action, ActionIterator};
 use crate::scheduling::swap::Swapper;
-use crate::scheduling::{BackwardsMachine, Step};
+use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use std::collections::{BinaryHeap, HashMap};
 use xxhash_rust::xxh3::Xxh3Builder;
 
@@ -37,7 +37,7 @@ impl PartialOrd for ScheduleNode {
     }
 }
 
-#[derive()]
+#[derive(Clone)]
 pub struct Explored {
     came_from: BackwardsMachine,
     steps: Vec<Step>,
@@ -53,14 +53,18 @@ where
 {
     type Summary: Sized;
 
-    fn schedule(mut self, start: BackwardsMachine) -> (Vec<Step>, Self::Summary) {
+    fn schedule(
+        mut self,
+        info: ScheduleInfo,
+        start: BackwardsMachine,
+    ) -> (Vec<Step>, Self::Summary) {
         let mut queue: ScheduleQueue = BinaryHeap::new();
-        let est_capacity = self.estimate_explored_map_size(&start);
+        let est_capacity = self.estimate_explored_map_size(info, &start);
         let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Xxh3Builder::default());
-        self.on_schedule_start(&start);
+        self.on_schedule_start(info, &start);
 
-        let score = self.remaining_distance_heuristic(&start, 0);
+        let score = self.remaining_distance_heuristic(info, &start, 0);
         queue.push(ScheduleNode {
             state: start.clone(),
             cost: 0,
@@ -69,8 +73,6 @@ where
         });
 
         while let Some(node) = queue.pop() {
-            // println!("popped node:");
-            // show(&node);
             if node.at_end {
                 let mut state_key = &node.state;
                 let mut all_steps = vec![];
@@ -78,29 +80,33 @@ where
                     all_steps.extend(e.steps.clone().into_iter().rev());
                     state_key = &e.came_from;
                 }
-                let summary = self.summarize(&node, &all_steps, &queue, &explored);
+                let summary = self.summarize(info, &node, &all_steps, &queue, &explored);
                 return (all_steps, summary);
             }
-            for action in ActionIterator::new(&node.state) {
+            for action in ActionIterator::new(info, &node.state) {
                 let mut new_state = node.state.clone();
                 let mut steps = vec![];
-                new_state.apply(action, &mut steps);
+                new_state.apply(info, action, &mut steps);
                 let at_end = new_state.all_done();
                 if at_end {
-                    let mut swapper =
-                        Swapper::new(&mut new_state.stack, &start.target_input_stack[..]);
-                    match swapper.get_swaps() {
-                        Ok(s) => steps.extend(s.into_iter().map(Step::Swap)),
-                        Err(_) => continue,
+                    if new_state.stack.len() == 0 {
+                        debug_assert_eq!(info.target_input_stack.len(), 0, "Ended with a stack of size 0 but target_input_stack has a non-zero length");
+                    } else {
+                        let mut swapper =
+                            Swapper::new(&mut new_state.stack, info.target_input_stack);
+                        match swapper.get_swaps() {
+                            Ok(s) => steps.extend(s.into_iter().map(Step::Swap)),
+                            Err(_) => continue,
+                        }
+                        assert!(
+                            swapper.matching_count().unwrap(),
+                            "Not-matching count according to swapper despite all_done => true"
+                        );
                     }
-                    assert!(
-                        swapper.matching_count().unwrap(),
-                        "Not-matching count according to swapper despite all_done => true"
-                    );
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 let e = explored.get(&new_state);
-                self.on_explored_path(&new_state, new_cost, &e);
+                self.on_explored_path(info, &new_state, new_cost, &e);
                 let new_cost_better = e.map(|e| new_cost < e.cost).unwrap_or(true);
                 if new_cost_better {
                     explored.insert(
@@ -111,7 +117,8 @@ where
                             steps,
                         },
                     );
-                    let score = new_cost + self.remaining_distance_heuristic(&new_state, new_cost);
+                    let score =
+                        new_cost + self.remaining_distance_heuristic(info, &new_state, new_cost);
                     queue.push(ScheduleNode {
                         state: new_state,
                         cost: new_cost,
@@ -129,26 +136,37 @@ where
 
     fn summarize(
         &mut self,
+        info: ScheduleInfo,
         node: &ScheduleNode,
         steps: &Vec<Step>,
         queue: &ScheduleQueue,
         explored: &ExploredMap,
     ) -> Self::Summary;
 
-    fn estimate_explored_map_size(&mut self, _start_state: &BackwardsMachine) -> usize {
+    fn estimate_explored_map_size(
+        &mut self,
+        _info: ScheduleInfo,
+        _start_state: &BackwardsMachine,
+    ) -> usize {
         0
     }
 
-    fn remaining_distance_heuristic(&mut self, _state: &BackwardsMachine, _cost: u32) -> u32 {
+    fn remaining_distance_heuristic(
+        &mut self,
+        _info: ScheduleInfo,
+        _state: &BackwardsMachine,
+        _cost: u32,
+    ) -> u32 {
         0
     }
 
     #[inline]
-    fn on_schedule_start(&mut self, _start_state: &BackwardsMachine) {}
+    fn on_schedule_start(&mut self, _info: ScheduleInfo, _start_state: &BackwardsMachine) {}
 
     #[inline]
     fn on_explored_path(
         &mut self,
+        _info: ScheduleInfo,
         _new_state: &BackwardsMachine,
         _new_cost: u32,
         _explored: &Option<&Explored>,

@@ -1,5 +1,5 @@
 use crate::comp_graph::CompNodeId;
-use crate::scheduling::BackwardsMachine;
+use crate::scheduling::{BackwardsMachine, ScheduleInfo};
 use crate::Searchable;
 use std::vec::IntoIter;
 
@@ -14,17 +14,15 @@ pub enum Action {
 pub struct ActionIterator(IntoIter<Action>);
 
 impl ActionIterator {
-    pub fn new(machine: &BackwardsMachine) -> Self {
+    pub fn new(info: ScheduleInfo, machine: &BackwardsMachine) -> Self {
         let mut actions = vec![];
 
-        actions.extend(
-            machine
-                .target_input_stack
-                .iter()
-                .map(|id| *id)
-                .filter(|id| machine.blocked_by[*id] == Some(0))
-                .map(Action::Unpop),
-        );
+        let unpoppable: Vec<_> = info
+            .target_input_stack
+            .iter()
+            .map(|id| *id)
+            .filter(|id| machine.blocked_by[*id] == Some(0))
+            .collect();
 
         let stack = machine.stack();
         let total_stack_el = stack.len();
@@ -40,16 +38,18 @@ impl ActionIterator {
             })
         }));
 
-        actions.extend((0..machine.nodes.len()).filter_map(|id| {
-            if machine.blocked_by[id] != Some(0) {
+        actions.extend((0..info.nodes.len()).filter_map(|id| {
+            if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
                 return None;
             }
-            if machine.nodes[id].has_output {
-                let idx = machine
-                    .stack()
-                    .iter()
-                    .index_of(&id)
-                    .expect("Not-done, 0 block comp not on stack???");
+            if info.nodes[id].has_output {
+                let idx = machine.stack().iter().index_of(&id).expect(
+                    format!(
+                        "Not-yet-done, comp node with 0 blocks not on stack (id: {}, stack: {:?})",
+                        id, stack
+                    )
+                    .as_str(),
+                );
                 if idx < deepest_idx {
                     None
                 } else {
@@ -59,6 +59,8 @@ impl ActionIterator {
                 Some(Action::UndoEffect(id))
             }
         }));
+
+        actions.extend(unpoppable.into_iter().map(Action::Unpop));
 
         Self(actions.into_iter())
     }

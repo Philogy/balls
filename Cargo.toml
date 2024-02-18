@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ariadne = "0.4.0"
 chumsky = "0.9.3"
+clap = { version = "4.5.1", features = ["derive"] }
 num-bigint = "0.4.4"
 
 

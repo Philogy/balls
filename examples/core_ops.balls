@@ -8,6 +8,8 @@
 // Constants
 #define op calldataload = stack(1, 1)
 #define op caller = stack(0, 1)
+#define op timestamp = stack(0, 1)
+#define op gas = stack(0, 1)
 #define op returndatasize = stack(0, 1) reads(RETURNDATA)
 
 // Pure ops
@@ -17,11 +19,15 @@
 #define op or = stack(2, 1)
 
 // Memory ops
+#define op calldatacopy = stack(3, 0) writes(MEMORY, MEMSIZE)
 #define op msize = stack(0, 1) reads(MEMSIZE)
 #define op mload = stack(1, 1) reads(MEMORY) writes(MEMSIZE)
 #define op mstore = stack(2, 0) writes(MEMORY, MEMSIZE)
 
 #define op sha3 = stack(2, 1) reads(MEMORY)
+
+// Calls
+#define op staticcall = stack(6, 1) reads(STORAGE) writes(MEMORY, MEMSIZE, RETURNDATA)
 
 // Storage
 #define op sload = stack(1, 1) reads(STOP) writes(STORAGE)

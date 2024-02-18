@@ -150,10 +150,10 @@ impl GlobalContext {
             .collect();
 
         // Assign IDs to statements.
-        let statement_ids: Vec<_> = macro_def
+        let assignments: Vec<_> = macro_def
             .body
             .iter()
-            .map(|statement| {
+            .filter_map(|statement| {
                 // Convert nested expressions to nodes and assign IDs
                 let (id, has_output) = self.map_expr(&mut ctx, &statement.expr.inner);
                 assert_eq!(
@@ -163,17 +163,16 @@ impl GlobalContext {
                     statement.ident
                 );
 
+                let spanned_ident = statement.ident.as_ref()?;
+                let ident = spanned_ident.inner.clone();
 
-                if let Some(spanned_ident) = &statement.ident {
-                    let ident = &spanned_ident.inner;
-                    ctx.set_ident(ident.clone(), id);
-                    // TODO: Prevent more kinds of shadowing.
-                    self.ops.iter().for_each(|op| {
-                        assert!(ident != &op.name, "TODO: Variable named {:?} shadows existing op definition", &ident)
-                    });
-                }
+                ctx.set_ident(ident.clone(), id);
+                // TODO: Prevent more kinds of shadowing.
+                self.ops.iter().for_each(|op| {
+                    assert!(&ident != &op.name, "TODO: Variable named {:?} shadows existing op definition", &ident)
+                });
 
-                id
+                Some((ident, id))
             })
             .collect();
 
@@ -183,7 +182,7 @@ impl GlobalContext {
             .iter()
             .map(|output| {
                 *ctx.get_ident(output)
-                    .expect(format!("TODO: Undefined ouput identifer {:?}", output).as_str())
+                    .expect(format!("TODO: Undefined output identifer {:?}", output).as_str())
             })
             .collect();
 
@@ -202,7 +201,7 @@ impl GlobalContext {
             nodes: ctx.nodes,
             input_ids,
             output_ids,
-            statement_ids,
+            assignments,
             top_level_deps,
         }
     }
@@ -312,6 +311,6 @@ mod test {
 
         assert_eq!(transform.nodes, vec![]);
         assert_eq!(transform.output_ids, vec![]);
-        assert_eq!(transform.statement_ids, vec![]);
+        assert_eq!(transform.assignments, vec![]);
     }
 }
