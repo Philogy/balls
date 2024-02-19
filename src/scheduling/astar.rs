@@ -1,8 +1,55 @@
-use super::actions::{Action, ActionIterator};
+use super::actions::ActionIterator;
 use crate::scheduling::swap::Swapper;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
+use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
+use std::time::Instant;
 use xxhash_rust::xxh3::Xxh3Builder;
+
+#[derive(Debug, Clone)]
+pub struct SchedulingTracker {
+    start: Instant,
+    total_time: f64,
+    final_cost: u32,
+    total_explored: usize,
+    capacity_estimation: f64,
+}
+
+impl SchedulingTracker {
+    pub fn record_end(&mut self, final_cost: u32, capacity_estimation: f64) {
+        self.total_time = self.start.elapsed().as_secs_f64();
+        self.final_cost = final_cost;
+        self.capacity_estimation = capacity_estimation;
+    }
+
+    pub fn report(&self) {
+        println!("\nScheduling: {}", self.total_time.humanize_seconds());
+        println!(
+            "explored: {} ({:.0} / s)",
+            self.total_explored,
+            self.total_explored as f64 / self.total_time
+        );
+        println!("cost (total SWAPs): {}", self.final_cost);
+        let (is_pos, fmt_factor) = self.capacity_estimation.humanize_factor();
+        if is_pos {
+            println!("Overestimated explored nodes by: {}", fmt_factor);
+        } else {
+            println!("Underestimated explored nodes by: {}", fmt_factor);
+        }
+    }
+}
+
+impl Default for SchedulingTracker {
+    fn default() -> Self {
+        Self {
+            start: Instant::now(),
+            total_time: 0.0,
+            final_cost: 0,
+            total_explored: 0,
+            capacity_estimation: 0.0,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScheduleNode {
@@ -47,24 +94,20 @@ pub struct Explored {
 pub type ExploredMap = HashMap<BackwardsMachine, Explored, Xxh3Builder>;
 pub type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
-pub trait AStarScheduler<A>: Sized
-where
-    A: Iterator<Item = Action>,
-{
-    type Summary: Sized;
-
+pub trait AStarScheduler: Sized {
     fn schedule(
         mut self,
         info: ScheduleInfo,
         start: BackwardsMachine,
-    ) -> (Vec<Step>, Self::Summary) {
+    ) -> (Vec<Step>, SchedulingTracker) {
+        let mut tracker = SchedulingTracker::default();
+
         let mut queue: ScheduleQueue = BinaryHeap::new();
         let est_capacity = self.estimate_explored_map_size(info, &start);
         let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Xxh3Builder::default());
-        self.on_schedule_start(info, &start);
 
-        let score = self.remaining_distance_heuristic(info, &start, 0);
+        let score = self.estimate_remaining_cost(info, &start, 0);
         queue.push(ScheduleNode {
             state: start.clone(),
             cost: 0,
@@ -80,8 +123,8 @@ where
                     all_steps.extend(e.steps.clone().into_iter().rev());
                     state_key = &e.came_from;
                 }
-                let summary = self.summarize(info, &node, &all_steps, &queue, &explored);
-                return (all_steps, summary);
+                tracker.record_end(node.cost, est_capacity as f64 / explored.len() as f64);
+                return (all_steps, tracker);
             }
             for action in ActionIterator::new(info, &node.state) {
                 let mut new_state = node.state.clone();
@@ -106,7 +149,7 @@ where
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 let e = explored.get(&new_state);
-                self.on_explored_path(info, &new_state, new_cost, &e);
+                tracker.total_explored += 1;
                 let new_cost_better = e.map(|e| new_cost < e.cost).unwrap_or(true);
                 if new_cost_better {
                     explored.insert(
@@ -117,8 +160,7 @@ where
                             steps,
                         },
                     );
-                    let score =
-                        new_cost + self.remaining_distance_heuristic(info, &new_state, new_cost);
+                    let score = new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
                     queue.push(ScheduleNode {
                         state: new_state,
                         cost: new_cost,
@@ -134,15 +176,6 @@ where
         unreachable!()
     }
 
-    fn summarize(
-        &mut self,
-        info: ScheduleInfo,
-        node: &ScheduleNode,
-        steps: &Vec<Step>,
-        queue: &ScheduleQueue,
-        explored: &ExploredMap,
-    ) -> Self::Summary;
-
     fn estimate_explored_map_size(
         &mut self,
         _info: ScheduleInfo,
@@ -151,25 +184,10 @@ where
         0
     }
 
-    fn remaining_distance_heuristic(
+    fn estimate_remaining_cost(
         &mut self,
         _info: ScheduleInfo,
         _state: &BackwardsMachine,
         _cost: u32,
-    ) -> u32 {
-        0
-    }
-
-    #[inline]
-    fn on_schedule_start(&mut self, _info: ScheduleInfo, _start_state: &BackwardsMachine) {}
-
-    #[inline]
-    fn on_explored_path(
-        &mut self,
-        _info: ScheduleInfo,
-        _new_state: &BackwardsMachine,
-        _new_cost: u32,
-        _explored: &Option<&Explored>,
-    ) {
-    }
+    ) -> u32;
 }

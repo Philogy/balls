@@ -23,10 +23,6 @@ impl BackwardsMachine {
         self.blocked_by.iter().all(|b| b.is_none())
     }
 
-    pub fn stack(&self) -> &Vec<CompNodeId> {
-        &self.stack
-    }
-
     pub fn apply(&mut self, info: ScheduleInfo, action: Action, steps: &mut Vec<Step>) {
         match action {
             Action::Unpop(id) => self.unpop(info, id, steps),

@@ -24,7 +24,7 @@ impl ActionIterator {
             .filter(|id| machine.blocked_by[*id] == Some(0))
             .collect();
 
-        let stack = machine.stack();
+        let stack = &machine.stack;
         let total_stack_el = stack.len();
         let deepest_idx = total_stack_el.checked_sub(17).unwrap_or(0);
 
@@ -43,7 +43,7 @@ impl ActionIterator {
                 return None;
             }
             if info.nodes[id].has_output {
-                let idx = machine.stack().iter().index_of(&id).expect(
+                let idx = machine.stack.iter().index_of(&id).expect(
                     format!(
                         "Not-yet-done, comp node with 0 blocks not on stack (id: {}, stack: {:?})",
                         id, stack

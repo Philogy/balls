@@ -72,16 +72,13 @@ fn main() {
 
         let preprocessing_time = start.elapsed().as_secs_f64();
 
-        // Schedule and measure time elapsed.
-        let start = Instant::now();
-        let (steps, (cost, total, capacity_est)) = Guessooor::new(args.guess).schedule(
+        let (steps, tracker) = Guessooor::new(args.guess).schedule(
             ScheduleInfo {
                 nodes: nodes.as_slice(),
                 target_input_stack: tmacro.input_ids.as_slice(),
             },
             machine,
         );
-        let schedule_time = start.elapsed().as_secs_f64();
 
         let output =
             huff_formatter::format_with_stack_comments(&tmacro, steps, args.comment, args.indent);
@@ -93,19 +90,9 @@ fn main() {
             "Macro pre-processing: {}",
             preprocessing_time.humanize_seconds()
         );
-        println!("\nScheduling: {}", schedule_time.humanize_seconds());
-        println!(
-            "explored: {} ({:.0} / s)",
-            total,
-            total as f64 / schedule_time
-        );
-        println!("cost: {}", cost);
-        let (is_pos, fmt_factor) = capacity_est.humanize_factor();
-        if is_pos {
-            println!("Overestimated explored nodes by: {}", fmt_factor);
-        } else {
-            println!("Underestimated explored nodes by: {}", fmt_factor);
-        }
+
+        tracker.report();
+
         if ctx.macros.len() > 1 {
             println!(
                 "TODO-WARNING: More than 1 macro found, only scheduling one at a time for now"
