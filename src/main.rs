@@ -1,7 +1,7 @@
 use balls::huff_formatter;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
-use balls::scheduling::schedulers::Guessooor;
+use balls::scheduling::schedulers::{Dijkstra, Guessooor};
 use balls::scheduling::{BackwardsMachine, ScheduleInfo};
 use balls::transformer::GlobalContext;
 use balls::TimeDelta;
@@ -82,14 +82,15 @@ fn main() {
 
         let preprocessing_time = start.elapsed().as_secs_f64();
 
-        let (steps, tracker) = Guessooor::new(args.guess).schedule(
-            ScheduleInfo {
-                nodes: nodes.as_slice(),
-                target_input_stack: tmacro.input_ids.as_slice(),
-            },
-            machine,
-            args.max_stack_depth,
-        );
+        let info = ScheduleInfo {
+            nodes: nodes.as_slice(),
+            target_input_stack: tmacro.input_ids.as_slice(),
+        };
+        let (steps, tracker) = if args.dijkstra {
+            Dijkstra.schedule(info, machine, args.max_stack_depth)
+        } else {
+            Guessooor::new(args.guess).schedule(info, machine, args.max_stack_depth)
+        };
 
         let output =
             huff_formatter::format_with_stack_comments(&tmacro, steps, args.comment, args.indent);
