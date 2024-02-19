@@ -22,6 +22,7 @@ fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
         .or(keyword("stack", Token::Stack))
         .or(keyword("reads", Token::Reads))
         .or(keyword("writes", Token::Writes))
+        .or(keyword("extern", Token::External))
 }
 
 fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {

@@ -51,6 +51,7 @@ pub fn format_with_stack_comments(
         let step_repr = match step {
             Step::Op(id) => match &tmacro.nodes[id].1 {
                 Computation::Op(ident) => ident.clone(),
+                Computation::External(ident) => format!("{}()", ident),
                 Computation::TopLevelInput(ident) => ident.clone(),
                 Computation::Const(num) => format!("0x{:x}", num),
             },

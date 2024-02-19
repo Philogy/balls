@@ -252,9 +252,15 @@ impl GlobalContext {
 
                 let arg_ids = mapped_args.into_iter().map(|(id, _)| id).collect();
 
+                let comp = if op.external {
+                    Computation::External
+                } else {
+                    Computation::Op
+                };
+
                 ctx.nodes.push((
                     CompNode::new(id, has_output, arg_ids, post_ids),
-                    Computation::Op(op.name.clone()),
+                    comp(op.name.clone()),
                 ));
 
                 (id, has_output)

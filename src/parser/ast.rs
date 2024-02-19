@@ -22,6 +22,7 @@ pub struct Statement {
 #[derive(Clone, Debug)]
 pub struct OpDefinition {
     pub name: Ident,
+    pub external: bool,
     pub stack_in: u16,
     pub stack_out: u16,
     pub reads: Vec<Ident>,

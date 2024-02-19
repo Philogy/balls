@@ -74,7 +74,8 @@ fn recover_for_round_delimited<T>(
 fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     let op_def_head = just(Token::Op)
         .ignore_then(get_ident())
-        .then_ignore(just(Token::Assign));
+        .then_ignore(just(Token::Assign))
+        .then(just(Token::External).or_not());
 
     let stack_io = just(Token::Stack).ignore_then(recover_for_round_delimited(
         stack_size()
@@ -84,19 +85,19 @@ fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
 
     let reads_writes = dependency_list(Token::Reads).then(dependency_list(Token::Writes));
 
-    op_def_head
-        .then(stack_io)
-        .then(reads_writes)
-        .map(|((name, stack_io), (reads, writes))| match stack_io {
+    op_def_head.then(stack_io).then(reads_writes).map(
+        |(((name, extern_token), stack_io), (reads, writes))| match stack_io {
             Ok((stack_in, stack_out)) => Ast::OpDef(OpDefinition {
                 name,
+                external: extern_token.is_some(),
                 stack_in,
                 stack_out,
                 reads,
                 writes,
             }),
             Err(()) => Ast::Error,
-        })
+        },
+    )
 }
 
 fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {

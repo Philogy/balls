@@ -47,11 +47,11 @@
 //                           PERMIT                           //
 ////////////////////////////////////////////////////////////////
 
-#define op _PERMIT_TYPEHASH = stack(0, 1)
-#define op _CACHED_DOMAIN_SEP = stack(0, 1)
-#define op _LOAD_ADDRESS = stack(1, 1)
-#define op _REQUIRE_NOT = stack(1, 0) reads(STOP)
-#define op _NONCES_SLOT = stack(1, 1)
+#define op _PERMIT_TYPEHASH = extern stack(0, 1)
+#define op _CACHED_DOMAIN_SEP = extern stack(0, 1)
+#define op _LOAD_ADDRESS = extern stack(1, 1)
+#define op _REQUIRE_NOT = extern stack(1, 0) reads(STOP)
+#define op _NONCES_SLOT = extern stack(1, 1)
 
 #define macro PERMIT<STOP> = [error] -> {
     // Load calldata.

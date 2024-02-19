@@ -13,6 +13,7 @@ pub enum Token {
     Stack,
     Reads,
     Writes,
+    External,
     // ============ Atoms =============
     Ident(Ident),
     Number(BigUint),

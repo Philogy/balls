@@ -4,6 +4,7 @@ use num_bigint::BigUint;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Computation {
     Op(Ident),
+    External(Ident),
     Const(BigUint),
     TopLevelInput(Ident),
 }
