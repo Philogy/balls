@@ -12,14 +12,14 @@ pub struct SchedulingTracker {
     total_time: f64,
     final_cost: u32,
     total_explored: usize,
-    capacity_estimation: f64,
+    capacity_estimation: (usize, usize),
 }
 
 impl SchedulingTracker {
-    pub fn record_end(&mut self, final_cost: u32, capacity_estimation: f64) {
+    pub fn record_end(&mut self, final_cost: u32, capacity_estimate: usize, final_capacity: usize) {
         self.total_time = self.start.elapsed().as_secs_f64();
         self.final_cost = final_cost;
-        self.capacity_estimation = capacity_estimation;
+        self.capacity_estimation = (capacity_estimate, final_capacity);
     }
 
     pub fn report(&self) {
@@ -30,11 +30,17 @@ impl SchedulingTracker {
             self.total_explored as f64 / self.total_time
         );
         println!("cost (total SWAPs): {}", self.final_cost);
-        let (is_pos, fmt_factor) = self.capacity_estimation.humanize_factor();
-        if is_pos {
-            println!("Overestimated explored nodes by: {}", fmt_factor);
+        let (capacity_estimate, final_capacity) = self.capacity_estimation;
+        if capacity_estimate == 0 {
+            println!("Final explored capacity (estimated 0): {}", final_capacity);
         } else {
-            println!("Underestimated explored nodes by: {}", fmt_factor);
+            let off_factor = capacity_estimate as f64 / final_capacity as f64;
+            let (is_pos, fmt_factor) = off_factor.humanize_factor();
+            if is_pos {
+                println!("Overestimated explored nodes by: {}", fmt_factor);
+            } else {
+                println!("Underestimated explored nodes by: {}", fmt_factor);
+            }
         }
     }
 }
@@ -46,7 +52,7 @@ impl Default for SchedulingTracker {
             total_time: 0.0,
             final_cost: 0,
             total_explored: 0,
-            capacity_estimation: 0.0,
+            capacity_estimation: (0, 0),
         }
     }
 }
@@ -124,7 +130,7 @@ pub trait AStarScheduler: Sized {
                     all_steps.extend(e.steps.clone().into_iter().rev());
                     state_key = &e.came_from;
                 }
-                tracker.record_end(node.cost, est_capacity as f64 / explored.len() as f64);
+                tracker.record_end(node.cost, est_capacity, explored.len());
                 return (all_steps, tracker);
             }
             for action in ActionIterator::new(info, &node.state) {
@@ -175,9 +181,7 @@ pub trait AStarScheduler: Sized {
             }
         }
 
-        // TODO: Add actual "couldn't schedule error" because this is reachable if no solutions are
-        // found because of stack too deep.
-        unreachable!()
+        panic!("TODO: Impossible to schedule within specified bounds (likely stack-too-deep).")
     }
 
     fn estimate_explored_map_size(
