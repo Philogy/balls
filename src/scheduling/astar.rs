@@ -99,6 +99,7 @@ pub trait AStarScheduler: Sized {
         mut self,
         info: ScheduleInfo,
         start: BackwardsMachine,
+        max_stack_depth: usize,
     ) -> (Vec<Step>, SchedulingTracker) {
         let mut tracker = SchedulingTracker::default();
 
@@ -130,6 +131,9 @@ pub trait AStarScheduler: Sized {
                 let mut new_state = node.state.clone();
                 let mut steps = vec![];
                 new_state.apply(info, action, &mut steps);
+                if new_state.stack.len() > max_stack_depth {
+                    continue;
+                }
                 let at_end = new_state.all_done();
                 if at_end {
                     if new_state.stack.len() == 0 {

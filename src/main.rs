@@ -32,10 +32,20 @@ struct Cli {
 
     #[clap(short, long, default_value_t = 4)]
     indent: usize,
+
+    #[clap(short, long, default_value_t = 1024)]
+    max_stack_depth: usize,
 }
 
 fn main() {
     let args = Cli::parse();
+
+    assert!(
+        args.max_stack_depth <= 1024,
+        "TODO: Invalid max stack depth of {}",
+        args.max_stack_depth
+    );
+
     let file_path = &args.file_path;
     let src = std::fs::read_to_string(file_path).unwrap();
 
@@ -78,6 +88,7 @@ fn main() {
                 target_input_stack: tmacro.input_ids.as_slice(),
             },
             machine,
+            args.max_stack_depth,
         );
 
         let output =
