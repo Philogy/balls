@@ -50,15 +50,17 @@ pub fn format_with_stack_comments(
     for step in steps {
         let step_repr = match step {
             Step::Op(id) => match &tmacro.nodes[id].1 {
-                Computation::Op(ident) => ident.clone(),
-                Computation::External(ident) => format!("{}()", ident),
-                Computation::TopLevelInput(ident) => ident.clone(),
-                Computation::Const(num) => format!("0x{:x}", num),
+                Computation::Op(ident) => (ident.clone(), None),
+                Computation::External(ident) => (format!("{}()", ident), Some(ident.clone())),
+                Computation::TopLevelInput(ident) => (ident.clone(), None),
+                Computation::Const(num) => (format!("0x{:x}", num), None),
             },
-            Step::Dup(depth) => format!("dup{}", depth),
-            Step::Swap(depth) => format!("swap{}", depth),
-            Step::Pop => "pop".to_string(),
+            Step::Dup(depth) => (format!("dup{}", depth), None),
+            Step::Swap(depth) => (format!("swap{}", depth), None),
+            Step::Pop => ("pop".into(), None),
         };
+        let main_repr = step_repr.0;
+        let value_repr = step_repr.1.as_ref().unwrap_or(&main_repr);
         match step {
             Step::Op(id) => {
                 let mut args = vec![];
@@ -75,10 +77,12 @@ pub fn format_with_stack_comments(
                         stack.push(ident.clone());
                     }
                     (None, true) => match args.len() {
-                        0 => stack.push(step_repr.clone()),
-                        _ => stack.push(format!("{}({})", step_repr, args.join(", "))),
+                        0 => stack.push(value_repr.clone()),
+                        _ => stack.push(format!("{}({})", value_repr, args.join(", "))),
                     },
-                    (None, false) => {}
+                    (None, false) => {
+                        // No variable and output, which is consistent, add nothing to the stack.
+                    }
                     _ => panic!("Found assignment but comp node.has_output reported as f"),
                 }
             }
@@ -93,7 +97,7 @@ pub fn format_with_stack_comments(
                 stack.pop();
             }
         }
-        let lone_line = format!("{indent}{}", step_repr);
+        let lone_line = format!("{indent}{}", main_repr);
         let stack_repr = if stack.len() > 17 {
             format!("[..., {}]", stack[stack.len() - 17..].join(", "))
         } else {
