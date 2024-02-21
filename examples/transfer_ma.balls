@@ -23,15 +23,17 @@
 #define op mstore = stack(2, 0) writes(MEMORY)
 
 // Storage
-#define op sload = stack(1, 1) reads(STOP) writes(STORAGE)
+#define op sload = stack(1, 1) reads(STOP, STORAGE)
 #define op sstore = stack(2, 0) reads(STOP) writes(STORAGE)
 
 // Termination
 #define op return = stack(2, 0) reads(MEMORY) writes(STOP)
-#define op assertFalse = stack(1, 0) reads(STOP)
+
+// EXTERNAL
+#define op _REQUIRE_NOT = extern stack(1, 0) reads(STOP)
 
 // Define actual code
-#define macro TRANSFER<STOP> = [error] -> {
+#define macro TRANSFER = [error] -> {
     // Define some variables
     to = calldataload(0x04)
     amount = calldataload(0x24)
@@ -41,14 +43,17 @@
 
     // Check from balance and error.
     insufficient_bal = gt(amount, from_bal)
-    assertFalse(or(error, insufficient_bal))
+    error' = or(error, insufficient_bal)
+    _REQUIRE_NOT(error')
 
     // Update from balance.
-    sstore(caller(), sub(from_bal, amount))
+    new_from_bal = sub(from_bal, amount)
+    sstore(caller(), new_from_bal)
 
     // Update to balance.
     to_bal = sload(to)
-    sstore(to, add(to_bal, amount))
+    new_to_bal = add(to_bal, amount)
+    sstore(to, new_to_bal)
 
     // Return success (1).
     mstore(returndatasize(), 1)

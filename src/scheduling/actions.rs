@@ -17,11 +17,12 @@ impl ActionIterator {
     pub fn new(info: ScheduleInfo, machine: &BackwardsMachine) -> Self {
         let mut actions = vec![];
 
-        let unpoppable: Vec<_> = info
-            .target_input_stack
-            .iter()
-            .map(|id| *id)
-            .filter(|id| machine.blocked_by[*id] == Some(0))
+        let unpoppable: Vec<_> = (0..info.nodes.len())
+            .filter(|id| {
+                machine.blocked_by[*id] == Some(0)
+                    && info.nodes[*id].has_output
+                    && !machine.stack.contains(id)
+            })
             .collect();
 
         let stack = &machine.stack;

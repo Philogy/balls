@@ -71,14 +71,11 @@ impl BackwardsMachine {
             "Unpopping blocked/done element (id: {})",
             id
         );
-        debug_assert!(
-            info.target_input_stack.contains(&id),
-            "Unpopping element not in input stack (id: {})",
-            id
-        );
         // One unpop is sufficient to guarantee being done because every input stack element is
         // expected to be unique.
-        self.blocked_by[id] = None;
+        if info.target_input_stack.contains(&id) {
+            self.blocked_by[id] = None;
+        }
         self.stack.push(id);
 
         steps.push(Step::Pop);
@@ -251,21 +248,14 @@ impl From<TransformedMacro> for BackwardsMachine {
             blocked_by[id] += required_dedups;
         }
 
-        let blocked_by = (0..nodes)
-            .map(|id| {
-                let input_count = tmacro.input_ids.iter().total(&id);
-                let already_done = blocked_by[id] == 0
-                    && stack.iter().total(&id) == input_count
-                    && !tmacro.top_level_deps.contains(&id);
-
-                if already_done && input_count == 0 {
-                    println!("TODO: Warning skipping scheduling for unused node {}", id);
-                }
-
-                if already_done {
+        let blocked_by = blocked_by
+            .into_iter()
+            .enumerate()
+            .map(|(id, blocked)| {
+                if blocked == 0 && tmacro.input_ids.contains(&id) && stack.contains(&id) {
                     None
                 } else {
-                    Some(blocked_by[id])
+                    Some(blocked)
                 }
             })
             .collect();

@@ -2,8 +2,6 @@ use crate::comp_graph::{CompNode, CompNodeId, Computation};
 use crate::parser::Ident;
 use std::collections::HashMap;
 
-const RESERVED_EMPTY_IDENTIFIER: &str = "_";
-
 #[derive(Clone, Debug, Default)]
 pub struct SemanticContext {
     next_id: CompNodeId,
@@ -21,9 +19,7 @@ impl SemanticContext {
     }
 
     pub fn set_ident(&mut self, ident: Ident, id: CompNodeId) {
-        if ident != RESERVED_EMPTY_IDENTIFIER {
-            self.ident_to_id.insert(ident, id);
-        }
+        self.ident_to_id.insert(ident, id);
     }
 
     pub fn get_ident(&self, ident: &Ident) -> Option<&CompNodeId> {

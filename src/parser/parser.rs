@@ -162,15 +162,8 @@ fn stack_parameters() -> impl Parser<Token, Vec<Ident>, Error = Simple<Token>> {
 
 fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     // macro TRANSFER
-    let macro_def = just(Token::Macro).ignore_then(get_ident());
-
-    // <DEP1, DEP2> =
-    let top_level_reads = get_ident()
-        .map_with_span(Spanned::new)
-        .list()
-        .at_least(1)
-        .delimited_by(just(Token::OpenAngle), just(Token::CloseAngle))
-        .or_default()
+    let macro_def = just(Token::Macro)
+        .ignore_then(get_ident())
         .then_ignore(just(Token::Assign));
 
     // [a, b, c]
@@ -191,14 +184,12 @@ fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
         .or_default();
 
     macro_def
-        .then(top_level_reads)
         .then(stack_in)
         .then(body)
         .then(stack_out)
-        .map(|((((name, top_level_reads), inputs), body), outputs)| {
+        .map(|(((name, inputs), body), outputs)| {
             Ast::Macro(Macro {
                 name,
-                top_level_reads,
                 inputs,
                 outputs,
                 body,

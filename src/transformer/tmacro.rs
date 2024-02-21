@@ -6,7 +6,6 @@ pub struct TransformedMacro {
     pub input_ids: Vec<CompNodeId>,
     pub output_ids: Vec<CompNodeId>,
     pub assignments: Vec<(String, CompNodeId)>,
-    pub top_level_deps: Vec<CompNodeId>,
 }
 
 impl TransformedMacro {

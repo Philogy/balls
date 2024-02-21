@@ -186,23 +186,11 @@ impl GlobalContext {
             })
             .collect();
 
-        let top_level_deps: Vec<CompNodeId> = macro_def
-            .top_level_reads
-            .into_iter()
-            .filter_map(|Spanned { inner: ident, .. }| {
-                if !self.deps.iter().contains(&ident) {
-                    panic!("TODO: Referencing nonexistent dependency {:?}", ident);
-                }
-                ctx.get_last_write(&ident)
-            })
-            .collect();
-
         TransformedMacro {
             nodes: ctx.nodes,
             input_ids,
             output_ids,
             assignments,
-            top_level_deps,
         }
     }
 
@@ -307,7 +295,6 @@ mod test {
 
         let macro_def = Macro {
             name: "empty".into(),
-            top_level_reads: vec![],
             inputs: vec![],
             outputs: vec![],
             body: vec![],

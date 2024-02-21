@@ -1,0 +1,2 @@
+#define macro POP_STUFF = [a, b, c] -> {
+} -> [a, c]
