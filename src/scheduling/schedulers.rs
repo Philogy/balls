@@ -34,3 +34,17 @@ impl AStarScheduler for Guessooor {
         (total_blocked as f32 * self.0).round() as u32
     }
 }
+
+// #[derive(Debug, Clone, Default)]
+// pub struct Ligma1;
+
+// impl AStarScheduler for Ligma1 {
+//     fn estimate_remaining_cost(
+//         &mut self,
+//         _info: ScheduleInfo,
+//         _state: &BackwardsMachine,
+//         _cost: u32,
+//     ) -> u32 {
+//         0
+//     }
+// }

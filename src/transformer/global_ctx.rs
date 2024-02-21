@@ -187,6 +187,7 @@ impl GlobalContext {
             .collect();
 
         TransformedMacro {
+            name: macro_def.name,
             nodes: ctx.nodes,
             input_ids,
             output_ids,

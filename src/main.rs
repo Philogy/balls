@@ -35,6 +35,9 @@ struct Cli {
 
     #[clap(short, long, default_value_t = 1024)]
     max_stack_depth: usize,
+
+    #[clap(short, long)]
+    show: bool,
 }
 
 fn main() {
@@ -69,46 +72,54 @@ fn main() {
     let parse_lex_time = start.elapsed().as_secs_f64();
 
     if let Some(ast_nodes) = maybe_ast_nodes {
-        let start = Instant::now();
         let ctx = GlobalContext::from(ast_nodes);
 
-        let macro_def = ctx.macros.first().expect("No macro to schedule");
-        println!("Macro {:?}", macro_def.name);
+        let schedule_summaries: Vec<_> = ctx
+            .macros
+            .iter()
+            .map(|macro_def| {
+                let tmacro = ctx.transform(macro_def.clone());
+                if args.show {
+                    tmacro.show_comps();
+                }
 
-        let tmacro = ctx.transform(macro_def.clone());
+                let start = Instant::now();
+                let machine: BackwardsMachine = tmacro.clone().into();
+                let preprocessing_time = start.elapsed().as_secs_f64();
 
-        let machine: BackwardsMachine = tmacro.clone().into();
-        let nodes: Vec<_> = tmacro.nodes.iter().map(|(node, _)| node.clone()).collect();
+                let nodes: Vec<_> = tmacro.nodes.iter().map(|(node, _)| node.clone()).collect();
 
-        let preprocessing_time = start.elapsed().as_secs_f64();
+                let info = ScheduleInfo {
+                    nodes: nodes.as_slice(),
+                    target_input_stack: tmacro.input_ids.as_slice(),
+                };
+                let (steps, tracker) = if args.dijkstra {
+                    Dijkstra.schedule(info, machine, args.max_stack_depth)
+                } else {
+                    Guessooor::new(args.guess).schedule(info, machine, args.max_stack_depth)
+                };
 
-        let info = ScheduleInfo {
-            nodes: nodes.as_slice(),
-            target_input_stack: tmacro.input_ids.as_slice(),
-        };
-        let (steps, tracker) = if args.dijkstra {
-            Dijkstra.schedule(info, machine, args.max_stack_depth)
-        } else {
-            Guessooor::new(args.guess).schedule(info, machine, args.max_stack_depth)
-        };
+                let output = huff_formatter::format_with_stack_comments(
+                    &tmacro,
+                    steps,
+                    args.comment,
+                    args.indent,
+                );
+                println!("{}\n", output);
 
-        let output =
-            huff_formatter::format_with_stack_comments(&tmacro, steps, args.comment, args.indent);
-        println!("{}", output);
+                (tmacro.name, tracker, preprocessing_time)
+            })
+            .collect();
 
-        println!();
+        println!("\n\n");
         println!("Lexing + parsing: {}", parse_lex_time.humanize_seconds());
-        println!(
-            "Macro pre-processing: {}",
-            preprocessing_time.humanize_seconds()
-        );
-
-        tracker.report();
-
-        if ctx.macros.len() > 1 {
+        for (name, tracker, preprocessing_time) in schedule_summaries {
+            println!("{}:", name);
             println!(
-                "TODO-WARNING: More than 1 macro found, only scheduling one at a time for now"
+                "  Macro pre-processing: {}",
+                preprocessing_time.humanize_seconds()
             );
+            tracker.report(2);
         }
     }
 }

@@ -24,7 +24,12 @@ pub fn format_with_stack_comments(
     comment_start: usize,
     indent: usize,
 ) -> String {
-    let mut out = String::new();
+    let mut out = format!(
+        "#define macro {}() = takes({}) returns({}) {{\n",
+        tmacro.name,
+        tmacro.input_ids.len(),
+        tmacro.output_ids.len()
+    );
 
     let main_width = comment_start - indent;
     let indent = " ".repeat(indent);
@@ -126,6 +131,8 @@ pub fn format_with_stack_comments(
     );
     out.push_str(&line);
     out.push('\n');
+
+    out.push_str("}");
 
     out
 }

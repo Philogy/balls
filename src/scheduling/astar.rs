@@ -21,24 +21,33 @@ impl SchedulingTracker {
         self.capacity_estimation = (capacity_estimate, final_capacity);
     }
 
-    pub fn report(&self) {
-        println!("\nScheduling: {}", self.total_time.humanize_seconds());
+    pub fn report(&self, indent: usize) {
+        let indent = " ".repeat(indent);
         println!(
-            "explored: {} ({:.0} / s)",
+            "{}Scheduling: {}",
+            indent,
+            self.total_time.humanize_seconds()
+        );
+        println!(
+            "{}explored: {} ({:.0} / s)",
+            indent,
             self.total_explored,
             self.total_explored as f64 / self.total_time
         );
-        println!("cost (total SWAPs): {}", self.final_cost);
+        println!("{}cost (total SWAPs): {}", indent, self.final_cost);
         let (capacity_estimate, final_capacity) = self.capacity_estimation;
         if capacity_estimate == 0 {
-            println!("Final explored capacity (estimated 0): {}", final_capacity);
+            println!(
+                "{}Final explored capacity (estimated 0): {}",
+                indent, final_capacity
+            );
         } else {
             let off_factor = capacity_estimate as f64 / final_capacity as f64;
             let (is_pos, fmt_factor) = off_factor.humanize_factor();
             if is_pos {
-                println!("Overestimated explored nodes by: {}", fmt_factor);
+                println!("{}Overestimated explored nodes by: {}", indent, fmt_factor);
             } else {
-                println!("Underestimated explored nodes by: {}", fmt_factor);
+                println!("{}Underestimated explored nodes by: {}", indent, fmt_factor);
             }
         }
     }
