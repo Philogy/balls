@@ -1,5 +1,4 @@
 use super::actions::ActionIterator;
-use crate::scheduling::swap::Swapper;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
@@ -122,7 +121,11 @@ pub trait AStarScheduler: Sized {
             at_end: start.all_done(),
         });
 
+        // 1. Pop top of priority queue (node closest to end according to actual cost + estimated
+        //    remaining distance).
         while let Some(node) = queue.pop() {
+            // 2a. If the shortest node is the end we know we found our solution, accumulate the
+            // steps and return.
             if node.at_end {
                 let mut state_key = &node.state;
                 let mut all_steps = vec![];
@@ -133,34 +136,20 @@ pub trait AStarScheduler: Sized {
                 tracker.record_end(node.cost, est_capacity, explored.len());
                 return (all_steps, tracker);
             }
+            // 2b. Not at the end explore all possible neighbours.
             for action in ActionIterator::new(info, &node.state) {
                 let mut new_state = node.state.clone();
                 let mut steps = vec![];
-                new_state.apply(info, action, &mut steps);
+                let at_end = new_state.apply(info, action, &mut steps).unwrap();
                 if new_state.stack.len() > max_stack_depth {
                     continue;
                 }
-                let at_end = new_state.all_done();
-                if at_end {
-                    if new_state.stack.len() == 0 {
-                        debug_assert_eq!(info.target_input_stack.len(), 0, "Ended with a stack of size 0 but target_input_stack has a non-zero length");
-                    } else {
-                        let mut swapper =
-                            Swapper::new(&mut new_state.stack, info.target_input_stack);
-                        match swapper.get_swaps() {
-                            Ok(s) => steps.extend(s.into_iter().map(Step::Swap)),
-                            Err(_) => continue,
-                        }
-                        assert!(
-                            swapper.matching_count().unwrap(),
-                            "Not-matching count according to swapper despite all_done => true"
-                        );
-                    }
-                }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
-                let e = explored.get(&new_state);
                 tracker.total_explored += 1;
-                let new_cost_better = e.map(|e| new_cost < e.cost).unwrap_or(true);
+                let new_cost_better = match explored.get(&new_state) {
+                    Some(e) => new_cost < e.cost,
+                    None => true,
+                };
                 if new_cost_better {
                     explored.insert(
                         new_state.clone(),
@@ -186,10 +175,11 @@ pub trait AStarScheduler: Sized {
 
     fn estimate_explored_map_size(
         &mut self,
-        _info: ScheduleInfo,
+        info: ScheduleInfo,
         _start_state: &BackwardsMachine,
     ) -> usize {
-        0
+        let total_nodes = info.nodes.len();
+        total_nodes * total_nodes * 300
     }
 
     fn estimate_remaining_cost(

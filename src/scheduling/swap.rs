@@ -63,15 +63,12 @@ impl<'a, T: Eq> Swapper<'a, T> {
         }
     }
 
-    pub fn get_swaps(&mut self) -> Result<Vec<usize>, &str> {
+    pub fn get_swaps(&mut self) -> Vec<usize> {
         let mut swaps = vec![];
         while let Some(depth) = self.next() {
-            if depth > 16 {
-                return Err("Swap required too deep");
-            }
             swaps.push(depth);
         }
-        Ok(swaps)
+        swaps
     }
 }
 

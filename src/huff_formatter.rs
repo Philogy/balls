@@ -41,7 +41,7 @@ pub fn format_with_stack_comments(
     let line = format!(
         "{indent}{:<width$}[{}]",
         "// takes:",
-        stack.join(","),
+        stack.join(", "),
         width = main_width + 3
     );
     out.push_str(&line);
@@ -121,7 +121,7 @@ pub fn format_with_stack_comments(
     let line = format!(
         "{indent}{:<width$}[{}]",
         "// returns:",
-        stack.join(","),
+        stack.join(", "),
         width = main_width + 3
     );
     out.push_str(&line);

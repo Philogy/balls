@@ -15,16 +15,11 @@ impl AStarScheduler for Dijkstra {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Guessooor {
-    blocked_to_distance: f32,
-}
+pub struct Guessooor(f32);
 
 impl Guessooor {
     pub fn new(blocked_to_distance: f32) -> Self {
-        Self {
-            blocked_to_distance,
-            ..Default::default()
-        }
+        Self(blocked_to_distance)
     }
 }
 
@@ -36,15 +31,6 @@ impl AStarScheduler for Guessooor {
         _cost: u32,
     ) -> u32 {
         let total_blocked = state.blocked_by.iter().map(|b| b.unwrap_or(0)).sum::<u32>();
-        (total_blocked as f32 * self.blocked_to_distance).round() as u32
-    }
-
-    fn estimate_explored_map_size(
-        &mut self,
-        info: ScheduleInfo,
-        _start_state: &BackwardsMachine,
-    ) -> usize {
-        let total_nodes = info.nodes.len();
-        total_nodes * total_nodes * 300
+        (total_blocked as f32 * self.0).round() as u32
     }
 }

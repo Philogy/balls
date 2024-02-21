@@ -1,6 +1,7 @@
 use crate::comp_graph::{CompNode, CompNodeId};
 use crate::scheduling::actions::Action;
 use crate::scheduling::Step;
+use crate::scheduling::Swapper;
 use crate::transformer::TransformedMacro;
 use crate::Searchable;
 
@@ -18,18 +19,49 @@ pub struct BackwardsMachine {
     pub blocked_by: Vec<Option<u32>>,
 }
 
+const MAX_VALID_SWAP_DEPTH: usize = 16;
+
 impl BackwardsMachine {
     pub fn all_done(&self) -> bool {
         self.blocked_by.iter().all(|b| b.is_none())
     }
 
-    pub fn apply(&mut self, info: ScheduleInfo, action: Action, steps: &mut Vec<Step>) {
+    pub fn apply(
+        &mut self,
+        info: ScheduleInfo,
+        action: Action,
+        steps: &mut Vec<Step>,
+    ) -> Result<bool, String> {
         match action {
             Action::Unpop(id) => self.unpop(info, id, steps),
             Action::UndoComp(id, stack_idx) => self.undo_comp(info, id, stack_idx, steps),
             Action::UndoEffect(id) => self.undo_effect(info, id, steps),
             Action::Dedup(as_top_idx, other_idx) => self.dedup(info, as_top_idx, other_idx, steps),
+        };
+
+        let at_end = self.all_done();
+        if at_end {
+            if self.stack.len() == 0 {
+                debug_assert_eq!(
+                    info.target_input_stack.len(),
+                    0,
+                    "Ended with a stack of size 0 but target_input_stack has a non-zero length"
+                );
+            } else {
+                let mut swapper = Swapper::new(&mut self.stack, info.target_input_stack);
+                for depth in swapper.get_swaps() {
+                    if depth > MAX_VALID_SWAP_DEPTH {
+                        return Err(format!("Invalid necessary swap depth: {}", depth));
+                    }
+                    steps.push(Step::Swap(depth));
+                }
+                assert!(
+                    swapper.matching_count().unwrap(),
+                    "Not-matching count according to swapper despite all_done => true"
+                );
+            }
         }
+        Ok(at_end)
     }
 
     fn unpop(&mut self, info: ScheduleInfo, id: CompNodeId, steps: &mut Vec<Step>) {
