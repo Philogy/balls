@@ -1,5 +1,6 @@
 use super::actions::get_actions;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
+use crate::CommaSeparatable;
 use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
@@ -31,31 +32,44 @@ impl SchedulingTracker {
             self.total_time.humanize_seconds()
         );
         println!(
-            "{}explored: {} ({:.0} / s)",
+            "{}explored: {} ({} / s)",
             indent,
-            self.total_explored,
-            self.total_explored as f64 / self.total_time
+            self.total_explored.comma_sep(),
+            ((self.total_explored as f64 / self.total_time).round() as usize).comma_sep()
         );
         println!("{}cost (total SWAPs): {}", indent, self.final_cost);
         let (capacity_estimate, final_capacity) = self.capacity_estimation;
         if capacity_estimate == 0 {
             println!(
                 "{}Final explored capacity (estimated 0): {}",
-                indent, final_capacity
+                indent,
+                final_capacity.comma_sep()
             );
         } else {
             let off_factor = capacity_estimate as f64 / final_capacity as f64;
             let (is_pos, fmt_factor) = off_factor.humanize_factor();
             if is_pos {
-                println!("{}Overestimated explored nodes by: {}", indent, fmt_factor);
+                println!(
+                    "{}Overestimated explored nodes by: {} (est: {} vs. final: {})",
+                    indent,
+                    fmt_factor,
+                    capacity_estimate.comma_sep(),
+                    final_capacity.comma_sep()
+                );
             } else {
-                println!("{}Underestimated explored nodes by: {}", indent, fmt_factor);
+                println!(
+                    "{}Underestimated explored nodes by: {} (est: {} vs. final: {})",
+                    indent,
+                    fmt_factor,
+                    capacity_estimate.comma_sep(),
+                    final_capacity.comma_sep()
+                );
             }
         }
         println!(
             "{}Overwritten explored: {} ({:.2}%)",
             indent,
-            self.total_collisions,
+            self.total_collisions.comma_sep(),
             self.total_collisions as f32 / final_capacity as f32 * 100.0
         );
     }
