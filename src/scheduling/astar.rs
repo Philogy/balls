@@ -1,7 +1,7 @@
 use super::actions::get_actions;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::TimeDelta;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::time::Instant;
 use xxhash_rust::xxh3::Xxh3Builder;
 
@@ -113,7 +113,7 @@ pub struct Explored {
     cost: u32,
 }
 
-pub type ExploredMap = HashMap<BackwardsMachine, Explored, Xxh3Builder>;
+pub type ExploredMap = BTreeMap<BackwardsMachine, Explored>;
 pub type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
 pub trait AStarScheduler: Sized {
@@ -127,8 +127,9 @@ pub trait AStarScheduler: Sized {
 
         let mut queue: ScheduleQueue = BinaryHeap::new();
         let est_capacity = self.estimate_explored_map_size(info, &start);
-        let mut explored: ExploredMap =
-            HashMap::with_capacity_and_hasher(est_capacity, Xxh3Builder::default());
+        // let mut explored: ExploredMap =
+        //     HashMap::with_capacity_and_hasher(est_capacity, Xxh3Builder::default());
+        let mut explored: ExploredMap = BTreeMap::new();
 
         let score = self.estimate_remaining_cost(info, &start, 0);
         queue.push(ScheduleNode {

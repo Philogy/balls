@@ -11,12 +11,20 @@ pub struct ScheduleInfo<'a> {
     pub target_input_stack: &'a [CompNodeId],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct BackwardsMachine {
     pub stack: Vec<CompNodeId>,
     /// Amount of post dependencies and dependent contracts before the given node can be marked as
     /// "done".
     pub blocked_by: Vec<Option<u32>>,
+}
+
+impl Ord for BackwardsMachine {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.stack
+            .cmp(&other.stack)
+            .then_with(|| self.blocked_by.cmp(&other.blocked_by))
+    }
 }
 
 const MAX_VALID_SWAP_DEPTH: usize = 16;
