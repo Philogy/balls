@@ -34,6 +34,10 @@ impl BackwardsMachine {
         self.blocked_by.iter().all(|b| b.is_none())
     }
 
+    pub fn total_blocked(&self) -> u32 {
+        self.blocked_by.iter().map(|b| b.unwrap_or(0)).sum::<u32>()
+    }
+
     pub fn apply(
         &mut self,
         info: ScheduleInfo,

@@ -30,8 +30,7 @@ impl AStarScheduler for Guessooor {
         state: &BackwardsMachine,
         _cost: u32,
     ) -> u32 {
-        let total_blocked = state.blocked_by.iter().map(|b| b.unwrap_or(0)).sum::<u32>();
-        (total_blocked as f32 * self.0).round() as u32
+        (state.total_blocked() as f32 * self.0).round() as u32
     }
 }
 

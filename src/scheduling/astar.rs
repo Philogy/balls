@@ -239,11 +239,11 @@ pub trait AStarScheduler: Sized {
 
     fn estimate_explored_map_size(
         &mut self,
-        info: ScheduleInfo,
-        _start_state: &BackwardsMachine,
+        _info: ScheduleInfo,
+        start_state: &BackwardsMachine,
     ) -> usize {
-        let total_nodes = info.nodes.len();
-        total_nodes * total_nodes * 300
+        let blocks = start_state.total_blocked() as usize;
+        blocks * blocks * 30
     }
 
     fn estimate_remaining_cost(
