@@ -8,6 +8,8 @@
 // Constants
 #define op calldataload = stack(1, 1)
 #define op caller = stack(0, 1)
+#define op calldatasize = stack(0, 1)
+#define op callvalue = stack(0, 1)
 #define op timestamp = stack(0, 1)
 #define op gas = stack(0, 1)
 #define op returndatasize = stack(0, 1) reads(RETURNDATA)
@@ -24,10 +26,11 @@
 #define op mload = stack(1, 1) reads(MEMORY) writes(MEMSIZE)
 #define op mstore = stack(2, 0) writes(MEMORY, MEMSIZE)
 
-#define op sha3 = stack(2, 1) reads(MEMORY, MEMSIZE)
+#define op sha3 = stack(2, 1) reads(MEMORY)
 
 // Calls
 #define op staticcall = stack(6, 1) reads(STORAGE) writes(MEMORY, MEMSIZE, RETURNDATA)
+#define op create2 = stack(4, 1) reads(MEMORY) writes(STORAGE, MEMSIZE)
 
 // Storage
 #define op sload = stack(1, 1) reads(STOP) writes(STORAGE)
@@ -37,3 +40,10 @@
 #define op revert = stack(2, 0) reads(MEMORY, STOP)
 #define op return = stack(2, 0) reads(MEMORY) writes(STOP)
 #define op stop = stack(0, 0) writes(STOP)
+
+#define macro FACTORY<STOP> = {
+    salt = calldataload(returndatasize())
+    code_size = sub(calldatasize(), 0x20)
+    calldatacopy(returndatasize(), 0x20, code_size)
+    result = create2(callvalue(), returndatasize(), code_size, salt)
+} -> [result]

@@ -28,11 +28,10 @@
 #define op mload = stack(1, 1) reads(MEMORY) writes(MEMSIZE)
 #define op mstore = stack(2, 0) writes(MEMORY, MEMSIZE)
 
-#define op sha3 = stack(2, 1) reads(MEMORY)
+#define op sha3 = stack(2, 1) reads(MEMORY, MEMSIZE)
 
 // Calls
 #define op staticcall = stack(6, 1) reads(STORAGE) writes(MEMORY, MEMSIZE, RETURNDATA)
-
 
 // Storage
 #define op sload = stack(1, 1) reads(STOP) writes(STORAGE)
@@ -53,7 +52,7 @@
 #define op _REQUIRE_NOT = extern stack(1, 0) reads(STOP)
 #define op _NONCES_SLOT = extern stack(1, 1)
 
-#define macro PERMIT<STOP> = [error] -> {
+#define macro PERMIT = [error] -> {
     // Load calldata.
     owner = _LOAD_ADDRESS(0x10)
     spender = _LOAD_ADDRESS(0x30)

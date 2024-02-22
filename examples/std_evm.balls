@@ -110,41 +110,7 @@
 #define op invalid = stack(0, 0) reads(CONTROL_FLOW)
 #define op selfdestruct = stack(1, 0) writes(CONTROL_FLOW)
 
-// EXTERNAL
-#define op _REQUIRE_NOT = extern stack(1, 0) reads(CONTROL_FLOW)
-
-// Define actual code
-#define macro TRANSFER = [error] -> {
-    // Define some variables
-    to = calldataload(0x04)
-    amount = calldataload(0x24)
-
-    // Get from balance.
-    from_bal = sload(caller())
-
-    // Check from balance and error.
-    insufficient_bal = gt(amount, from_bal)
-    error' = or(insufficient_bal, error)
-    _REQUIRE_NOT(error')
-
-    // Update from balance.
-    new_from_bal = sub(from_bal, amount)
-    sstore(caller(), new_from_bal)
-
-    // Update to balance.
-    to_bal = sload(to)
-    new_to_bal = add(to_bal, amount)
-    sstore(to, new_to_bal)
-
-    // Return success (1).
-    mstore(returndatasize(), 1)
-    return(returndatasize(), msize())
-}
-
-#define macro BALANCE_OF = [error] -> {
-    _REQUIRE_NOT(error)
-    owner = calldataload(0x04)
-    bal = sload(owner)
-    mstore(callvalue(), bal)
-    return(callvalue(), msize())
+#define macro TEST = {
+    x = add(3, 4)
+    y = mul(x, x)
 }
