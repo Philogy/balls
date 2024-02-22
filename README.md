@@ -29,7 +29,8 @@ using `--dijkstra` when the search is otherwise unconstrained.
 
 To speed up any of the above searches you may constrain the max stack depth that the program is
 allowed to have at any point. The default value is the EVM's max stack depth of 1024. Too low of
-a value may result in a stack-too-deep error.
+a value may result in a stack-too-deep error. Constraining can allow Dijkstra to terminate in
+reasonable times for larger examples such as `permit_ma.balls`.
 
 Note that if the value is too low the scheduler may output a scheduling but it may not be the most
 optimal possible schedule.
