@@ -1,4 +1,4 @@
-use super::actions::ActionIterator;
+use super::actions::get_actions;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
@@ -162,7 +162,7 @@ pub trait AStarScheduler: Sized {
                 return (all_steps, tracker);
             }
             // 2b. Not at the end explore all possible neighbours.
-            for action in ActionIterator::new(info, &node.state) {
+            for action in get_actions(info, &node.state) {
                 let mut new_state = node.state.clone();
                 let mut steps = vec![];
                 let at_end = new_state.apply(info, action, &mut steps).unwrap();
