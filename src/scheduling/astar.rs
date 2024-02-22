@@ -11,6 +11,7 @@ pub struct SchedulingTracker {
     total_time: f64,
     final_cost: u32,
     total_explored: usize,
+    total_collisions: usize,
     capacity_estimation: (usize, usize),
 }
 
@@ -50,6 +51,12 @@ impl SchedulingTracker {
                 println!("{}Underestimated explored nodes by: {}", indent, fmt_factor);
             }
         }
+        println!(
+            "{}Overwritten explored: {} ({:.2}%)",
+            indent,
+            self.total_collisions,
+            self.total_collisions as f32 / final_capacity as f32 * 100.0
+        );
     }
 }
 
@@ -60,6 +67,7 @@ impl Default for SchedulingTracker {
             total_time: 0.0,
             final_cost: 0,
             total_explored: 0,
+            total_collisions: 0,
             capacity_estimation: (0, 0),
         }
     }
@@ -142,7 +150,15 @@ pub trait AStarScheduler: Sized {
                     all_steps.extend(e.steps.clone().into_iter().rev());
                     state_key = &e.came_from;
                 }
-                tracker.record_end(node.cost, est_capacity, explored.len());
+
+                let explored_size = explored.len();
+
+                // Degen: Purposefully leak the data structures as it takes *a lot* of time to
+                // properly drop and clear.
+                std::mem::forget(explored);
+                std::mem::forget(queue);
+
+                tracker.record_end(node.cost, est_capacity, explored_size);
                 return (all_steps, tracker);
             }
             // 2b. Not at the end explore all possible neighbours.
@@ -160,7 +176,7 @@ pub trait AStarScheduler: Sized {
                     None => true,
                 };
                 if new_cost_better {
-                    explored.insert(
+                    let out = explored.insert(
                         new_state.clone(),
                         Explored {
                             came_from: node.state.clone(),
@@ -168,6 +184,7 @@ pub trait AStarScheduler: Sized {
                             steps,
                         },
                     );
+                    tracker.total_collisions += if out.is_some() { 1 } else { 0 };
                     let score = new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
                     queue.push(ScheduleNode {
                         state: new_state,
