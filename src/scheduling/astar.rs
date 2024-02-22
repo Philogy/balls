@@ -1,9 +1,10 @@
 use super::actions::get_actions;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::TimeDelta;
-use std::collections::{BTreeMap, BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap};
+use std::hash::{BuildHasherDefault, Hash, Hasher};
 use std::time::Instant;
-use xxhash_rust::xxh3::Xxh3Builder;
+use xxhash_rust::xxh3::{Xxh3, Xxh3Builder};
 
 #[derive(Debug, Clone)]
 pub struct SchedulingTracker {
@@ -108,13 +109,45 @@ impl PartialOrd for ScheduleNode {
 
 #[derive(Clone)]
 pub struct Explored {
-    came_from: BackwardsMachine,
+    came_from: u64,
     steps: Vec<Step>,
     cost: u32,
 }
 
-pub type ExploredMap = BTreeMap<BackwardsMachine, Explored>;
-pub type ScheduleQueue = BinaryHeap<ScheduleNode>;
+type ExploredMap = HashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
+type ScheduleQueue = BinaryHeap<ScheduleNode>;
+
+struct FastHasher(Xxh3);
+
+impl FastHasher {
+    fn new() -> Self {
+        Self(Xxh3Builder::new().build())
+    }
+
+    fn hash_one_off<T: Hash>(&mut self, value: &T) -> u64 {
+        value.hash(&mut self.0);
+        let hash = self.0.finish();
+        self.0.reset();
+        hash
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct NoopHasher(u64);
+
+impl Hasher for NoopHasher {
+    fn write(&mut self, _bytes: &[u8]) {
+        todo!()
+    }
+
+    fn write_u64(&mut self, i: u64) {
+        self.0 = i;
+    }
+
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
 
 pub trait AStarScheduler: Sized {
     fn schedule(
@@ -127,9 +160,8 @@ pub trait AStarScheduler: Sized {
 
         let mut queue: ScheduleQueue = BinaryHeap::new();
         let est_capacity = self.estimate_explored_map_size(info, &start);
-        // let mut explored: ExploredMap =
-        //     HashMap::with_capacity_and_hasher(est_capacity, Xxh3Builder::default());
-        let mut explored: ExploredMap = BTreeMap::new();
+        let mut explored: ExploredMap =
+            HashMap::with_capacity_and_hasher(est_capacity, Default::default());
 
         let score = self.estimate_remaining_cost(info, &start, 0);
         queue.push(ScheduleNode {
@@ -139,17 +171,20 @@ pub trait AStarScheduler: Sized {
             at_end: start.all_done(),
         });
 
+        let mut hasher = FastHasher::new();
+
         // 1. Pop top of priority queue (node closest to end according to actual cost + estimated
         //    remaining distance).
         while let Some(node) = queue.pop() {
+            let came_from = hasher.hash_one_off(&node.state);
             // 2a. If the shortest node is the end we know we found our solution, accumulate the
             // steps and return.
             if node.at_end {
-                let mut state_key = &node.state;
+                let mut state_key = came_from;
                 let mut all_steps = vec![];
-                while let Some(e) = explored.get(state_key) {
-                    all_steps.extend(e.steps.clone().into_iter().rev());
-                    state_key = &e.came_from;
+                while let Some(e) = explored.remove(&state_key) {
+                    all_steps.extend(e.steps.into_iter().rev());
+                    state_key = e.came_from;
                 }
 
                 let explored_size = explored.len();
@@ -162,6 +197,7 @@ pub trait AStarScheduler: Sized {
                 tracker.record_end(node.cost, est_capacity, explored_size);
                 return (all_steps, tracker);
             }
+
             // 2b. Not at the end explore all possible neighbours.
             for action in get_actions(info, &node.state) {
                 let mut new_state = node.state.clone();
@@ -172,15 +208,16 @@ pub trait AStarScheduler: Sized {
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 tracker.total_explored += 1;
-                let new_cost_better = match explored.get(&new_state) {
+                let new_state_hash = hasher.hash_one_off(&new_state);
+                let new_cost_better = match explored.get(&new_state_hash) {
                     Some(e) => new_cost < e.cost,
                     None => true,
                 };
                 if new_cost_better {
                     let out = explored.insert(
-                        new_state.clone(),
+                        new_state_hash,
                         Explored {
-                            came_from: node.state.clone(),
+                            came_from,
                             cost: new_cost,
                             steps,
                         },
