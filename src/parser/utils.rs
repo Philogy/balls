@@ -1,14 +1,15 @@
 use crate::parser::tokens::Token;
 use chumsky::{
-    combinator::{Map, OrNot, SeparatedBy},
-    primitive::{just, Just},
+    combinator::{Map, OrNot},
+    primitive::just,
     Error, Parser,
 };
 
 pub trait TokenParser<O, E: Error<Token>>: Parser<Token, O, Error = E> + Sized {
     /// Equivalent to `.separated_by(just(Token::Comma))`
-    fn list(self) -> SeparatedBy<Self, Just<Token, Token, E>, Token> {
+    fn list(self) -> impl Parser<Token, Vec<O>, Error = E> {
         self.separated_by(just(Token::Comma))
+            .then_ignore(just(Token::Comma).or_not())
     }
 }
 
