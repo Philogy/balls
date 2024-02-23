@@ -1,4 +1,5 @@
 use balls::huff_formatter;
+use balls::inject_std::get_std;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
 use balls::scheduling::schedulers::{Dijkstra, Guessooor};
@@ -71,7 +72,9 @@ fn main() {
     }
     let parse_lex_time = start.elapsed().as_secs_f64();
 
-    if let Some(ast_nodes) = maybe_ast_nodes {
+    if let Some(mut ast_nodes) = maybe_ast_nodes {
+        ast_nodes.extend(get_std());
+
         let ctx = GlobalContext::from(ast_nodes);
 
         let schedule_summaries: Vec<_> = ctx

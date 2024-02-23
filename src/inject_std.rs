@@ -1,3 +1,10 @@
+use crate::parser::ast::Ast;
+use crate::parser::Spanned;
+
+use crate::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
+
+pub fn get_std() -> Vec<Spanned<Ast>> {
+    let src = "
 ////////////////////////////////////////////////////////////////
 //                        DEPENDENCIES                        //
 ////////////////////////////////////////////////////////////////
@@ -108,4 +115,21 @@
 #define op return = stack(2, 0) writes(CONTROL_FLOW)
 #define op revert = stack(2, 0) reads(CONTROL_FLOW)
 #define op invalid = stack(0, 0) reads(CONTROL_FLOW)
-#define op selfdestruct = stack(1, 0) writes(CONTROL_FLOW)
+#define op selfdestruct = stack(1, 0) writes(CONTROL_FLOW)";
+
+    let lex_out = lexer::lex(src);
+
+    // TODO: Proper lexer error handling
+    let spanned_tokens = lex_out.unwrap();
+
+    let tokens: Vec<_> = spanned_tokens.iter().map(|t| t.inner.clone()).collect();
+
+    let (maybe_ast_nodes, errs) = parser::parse_tokens(tokens.clone());
+
+    let errored = print_errors(&src, "std_evm.balls", errs, |tok_span| {
+        resolve_span_span(tok_span, &spanned_tokens)
+    });
+    assert!(!errored, "std_evm errored");
+
+    maybe_ast_nodes.unwrap()
+}

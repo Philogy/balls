@@ -1,55 +1,7 @@
-////////////////////////////////////////////////////////////////
-//                          CORE OPS                          //
-////////////////////////////////////////////////////////////////
-
-// Define dependency types
-#define dependency STORAGE
-#define dependency MEMORY
-#define dependency MEMSIZE
-#define dependency RETURNDATA
-#define dependency STOP
-
-// Constants
-#define op calldataload = stack(1, 1)
-#define op caller = stack(0, 1)
-#define op timestamp = stack(0, 1)
-#define op gas = stack(0, 1)
-#define op returndatasize = stack(0, 1) reads(RETURNDATA)
-
-// Pure ops
-#define op add = stack(2, 1)
-#define op sub = stack(2, 1)
-#define op gt = stack(2, 1)
-#define op or = stack(2, 1)
-
-// Memory ops
-#define op calldatacopy = stack(3, 0) writes(MEMORY, MEMSIZE)
-#define op msize = stack(0, 1) reads(MEMSIZE)
-#define op mload = stack(1, 1) reads(MEMORY) writes(MEMSIZE)
-#define op mstore = stack(2, 0) writes(MEMORY, MEMSIZE)
-
-#define op sha3 = stack(2, 1) reads(MEMORY, MEMSIZE)
-
-// Calls
-#define op staticcall = stack(6, 1) reads(STORAGE) writes(MEMORY, MEMSIZE, RETURNDATA)
-
-// Storage
-#define op sload = stack(1, 1) reads(STOP) writes(STORAGE)
-#define op sstore = stack(2, 0) reads(STOP) writes(STORAGE)
-
-// Termination
-#define op revert = stack(2, 0) reads(MEMORY, STOP)
-#define op return = stack(2, 0) reads(MEMORY) writes(STOP)
-#define op stop = stack(0, 0) writes(STOP)
-
-////////////////////////////////////////////////////////////////
-//                           PERMIT                           //
-////////////////////////////////////////////////////////////////
-
 #define op _PERMIT_TYPEHASH = extern stack(0, 1)
 #define op _CACHED_DOMAIN_SEP = extern stack(0, 1)
 #define op _LOAD_ADDRESS = extern stack(1, 1)
-#define op _REQUIRE_NOT = extern stack(1, 0) reads(STOP)
+#define op _REQUIRE_NOT = extern stack(1, 0) reads(CONTROL_FLOW)
 #define op _NONCES_SLOT = extern stack(1, 1)
 
 #define macro PERMIT = [error] -> {
@@ -100,7 +52,7 @@
 
     _REQUIRE_NOT(
         or(
-            or(signature_invalid, deadline_invalid),
+            or(deadline_invalid, signature_invalid),
             error
         )
     )
