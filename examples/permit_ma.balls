@@ -52,7 +52,7 @@
 
     _REQUIRE_NOT(
         or(
-            or(deadline_invalid, signature_invalid),
+            or(signature_invalid, deadline_invalid),
             error
         )
     )

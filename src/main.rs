@@ -39,6 +39,35 @@ struct Cli {
 
     #[clap(short, long)]
     show: bool,
+
+    #[clap(short, long, help = "The path to which to write the output")]
+    output_path: Option<String>,
+}
+
+const BALLS_INSERT_START: &str = "\n// balls-insert-start\n";
+const BALLS_INSERT_END: &str = "\n// balls-insert-end\n";
+
+fn splice_into_huff(path: &str, content_to_inject: String) -> Result<(), String> {
+    let content =
+        std::fs::read_to_string(&path).map_err(|_| format!("Failed to read file {}", path))?;
+    let start_index = content
+        .find(BALLS_INSERT_START)
+        .ok_or(format!("Could not find \"{}\"", BALLS_INSERT_START))?
+        + BALLS_INSERT_START.len();
+    let end_index = content
+        .find(BALLS_INSERT_END)
+        .ok_or(format!("Could not find \"{}\"", BALLS_INSERT_END))?;
+
+    let new_content = format!(
+        "{}{}{}",
+        &content[..start_index],
+        content_to_inject,
+        &content[end_index..]
+    );
+
+    std::fs::write(&path, new_content).map_err(|_| format!("Failed to write file {}", path))?;
+
+    Ok(())
 }
 
 fn main() {
@@ -77,6 +106,8 @@ fn main() {
 
         let ctx = GlobalContext::from(ast_nodes);
 
+        let mut ball_macros: Vec<String> = Vec::new();
+
         let schedule_summaries: Vec<_> = ctx
             .macros
             .iter()
@@ -108,13 +139,22 @@ fn main() {
                     args.comment,
                     args.indent,
                 );
-                println!("{}\n", output);
+
+                ball_macros.push(output);
 
                 (tmacro.name, tracker, preprocessing_time)
             })
             .collect();
 
-        println!("\n\n");
+        let full_balls = ball_macros.join("\n\n");
+        match args.output_path {
+            None => println!("{}", full_balls),
+            Some(output_path) => {
+                splice_into_huff(&output_path, full_balls).unwrap();
+                println!("✅ Successfully inserted result into {}\n", &output_path);
+            }
+        }
+
         println!("Lexing + parsing: {}", parse_lex_time.humanize_seconds());
         for (name, tracker, preprocessing_time) in schedule_summaries {
             println!("{}:", name);

@@ -118,7 +118,7 @@ fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
                 } else {
                     emit(Simple::custom(
                         span,
-                        format!("Expression constant {:x} larger than 32-bytes", num),
+                        format!("Expression constant 0x{:x} larger than 32-bytes", num),
                     ));
                     BigUint::from_bytes_le(&[0xff; 32])
                 }
