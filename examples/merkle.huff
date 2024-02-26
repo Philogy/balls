@@ -1,0 +1,72 @@
+
+// balls-insert-start
+#define macro MERKLE_START() = takes(0) returns(3) {
+    // takes:                      []
+    0x84                        // [start_offset]
+    0x64                        // [start_offset, 0x64]
+    calldataload                // [start_offset, length]
+    0x5                         // [start_offset, length, 0x5]
+    shl                         // [start_offset, shl(0x5, length)]
+    dup2                        // [start_offset, shl(0x5, length), start_offset]
+    add                         // [start_offset, end_offset]
+    swap1                       // [end_offset, start_offset]
+    0x24                        // [end_offset, start_offset, 0x24]
+    calldataload                // [end_offset, start_offset, leaf]
+    // returns:                    [end_offset, start_offset, leaf]
+}
+
+#define macro MERKLE_VERIFY_BODY() = takes(3) returns(3) {
+    // takes:                      [end_ptr, cd_ptr, leaf]
+    dup2                        // [end_ptr, cd_ptr, leaf, cd_ptr]
+    calldataload                // [end_ptr, cd_ptr, leaf, interm_node]
+    dup2                        // [end_ptr, cd_ptr, leaf, interm_node, leaf]
+    dup2                        // [end_ptr, cd_ptr, leaf, interm_node, leaf, interm_node]
+    lt                          // [end_ptr, cd_ptr, leaf, interm_node, lt(interm_node, leaf)]
+    0x5                         // [end_ptr, cd_ptr, leaf, interm_node, lt(interm_node, leaf), 0x5]
+    shl                         // [end_ptr, cd_ptr, leaf, interm_node, scratch]
+    swap2                       // [end_ptr, cd_ptr, scratch, interm_node, leaf]
+    dup3                        // [end_ptr, cd_ptr, scratch, interm_node, leaf, scratch]
+    mstore                      // [end_ptr, cd_ptr, scratch, interm_node]
+    0x20                        // [end_ptr, cd_ptr, scratch, interm_node, 0x20]
+    0x20                        // [end_ptr, cd_ptr, scratch, interm_node, 0x20, 0x20]
+    swap3                       // [end_ptr, cd_ptr, 0x20, interm_node, 0x20, scratch]
+    xor                         // [end_ptr, cd_ptr, 0x20, interm_node, xor(scratch, 0x20)]
+    mstore                      // [end_ptr, cd_ptr, 0x20]
+    add                         // [end_ptr, cd_ptr']
+    msize                       // [end_ptr, cd_ptr', msize]
+    returndatasize              // [end_ptr, cd_ptr', msize, returndatasize]
+    sha3                        // [end_ptr, cd_ptr', leaf']
+    // returns:                    [end_ptr, cd_ptr', leaf']
+}
+// balls-insert-end
+
+#define macro MERKLE_COMPUTE_ROOT() = takes(3) returns(3) {
+    // takes:                     [end_ptr, cd_ptr, leaf]
+    dup3 dup3                  // [end_ptr, cd_ptr, leaf, cd_ptr, end_ptr]
+    eq loop_end jumpi          // [end_ptr, cd_ptr, leaf]
+    loop_start:                // [end_ptr, cd_ptr, leaf]
+        MERKLE_VERIFY_BODY()   // [end_ptr, cd_ptr', leaf']
+        dup3 dup3              // [end_ptr, cd_ptr, leaf, cd_ptr, end_ptr]
+        gt                     // [end_ptr, cd_ptr, leaf, end_ptr > cd_ptr]
+        loop_start jumpi       // [end_ptr, cd_ptr, leaf]
+    loop_end:                  // [end_ptr, cd_ptr, leaf]
+}
+
+
+#define function verify(bytes32 root, bytes32 leaf, bytes32[] proof) pure returns (bytes32) 
+
+#define macro MAIN() = takes(0) returns(0) {
+    0x0 calldataload 0xe0 shr
+
+    __FUNC_SIG(verify) sub empty_revert jumpi
+
+    //                            []
+    MERKLE_START()             // [end_ptr, cd_ptr, leaf]
+    MERKLE_COMPUTE_ROOT()      // [end_ptr, end_ptr, computed_root]
+    0x04 calldataload          // [end_ptr, end_ptr, computed_root, root]
+    sub empty_revert jumpi     // [end_ptr, end_ptr]
+    stop
+
+    empty_revert:
+        0x0 0x0 revert
+}

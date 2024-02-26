@@ -1,0 +1,15 @@
+#define macro MERKLE_START = {
+    leaf = calldataload(0x24)
+    length = calldataload(0x64)
+    start_offset = 0x84
+    end_offset = add(start_offset, shl(5, length))
+} -> [end_offset, start_offset, leaf]
+
+#define macro MERKLE_VERIFY_BODY = [end_ptr, cd_ptr, leaf] ->  {
+    interm_node = calldataload(cd_ptr)
+    scratch = shl(5, lt(interm_node, leaf))
+    mstore(scratch, leaf)
+    mstore(xor(scratch, 0x20), interm_node)
+    leaf' = sha3(returndatasize(), msize())
+    cd_ptr' = add(0x20, cd_ptr)
+} -> [end_ptr, cd_ptr', leaf']
