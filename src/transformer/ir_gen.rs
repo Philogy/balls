@@ -1,5 +1,5 @@
 // The computational graph can be considered the "IR" of balls.
-//
+
 use crate::parser::ast::{Expr, Function, HuffMacro, MacroArg};
 use crate::parser::Spanned;
 use crate::scheduling::ir::{CompNode, CompNodeId, IRGraph};
@@ -18,17 +18,36 @@ pub enum ValueSource {
 }
 
 impl ValueSource {
-    pub fn huff_repr(&self) -> String {
+    pub fn huff_repr(&self, symbols: &Symbols, using_variant: bool) -> String {
         match self {
-            Self::Op(ident) | Self::TopLevelInput(ident) => format!("{}", ident),
+            Self::Op(ident) => {
+                if !using_variant {
+                    ident.clone()
+                } else {
+                    match symbols.get(ident).expect("Invalid source identifier") {
+                        Spanned {
+                            inner: Symbol::Op(op),
+                            ..
+                        } => op
+                            .other
+                            .as_ref()
+                            .expect("Using variant flag with non-variant op")
+                            .0
+                            .clone(),
+                        unexpected => panic!("Expected op symbol, not {:?}", unexpected),
+                    }
+                }
+            }
+            Self::TopLevelInput(ident) => ident.clone(),
             Self::MacroInvoke(ident, args) => format!(
                 "{}({})",
                 ident,
                 args.iter()
                     .map(MacroArg::huff_repr)
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(", ")
             ),
+
             Self::MacroArg(arg) => arg.huff_repr(),
             Self::HuffConst(ident) => format!("[{}]", ident),
         }
@@ -309,11 +328,29 @@ pub fn gen_ir(
         nodes.as_mut_slice(),
     );
 
+    let variants: Vec<Option<Vec<usize>>> = sources
+        .iter()
+        .map(|src| {
+            let symbol = match src {
+                ValueSource::Op(ident) => {
+                    Some(&symbols.get(ident).expect("Invalid op ident").inner)
+                }
+                _ => None,
+            }?;
+            let other = match symbol {
+                Symbol::Op(op) => op.other.as_ref(),
+                _ => None,
+            }?;
+            Some(other.1.clone())
+        })
+        .collect();
+
     (
         IRGraph {
             input_ids,
             output_ids,
             nodes,
+            variants,
         },
         sources,
         assignments,

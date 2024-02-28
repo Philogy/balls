@@ -5,7 +5,7 @@ pub enum Step {
     Swap(usize),
     Dup(usize),
     Pop,
-    Comp(CompNodeId),
+    Comp(CompNodeId, bool),
 }
 
 impl Step {
@@ -14,7 +14,7 @@ impl Step {
             Self::Swap(_) => 1,
             Self::Pop => 0,
             Self::Dup(_) => 0,
-            Self::Comp(_) => 0,
+            Self::Comp(_, _) => 0,
         }
     }
 }

@@ -1,6 +1,7 @@
 use crate::parser::ast::{Function, MacroArg};
-use crate::scheduling::ir::{CompNode, CompNodeId};
+use crate::scheduling::ir::{CompNodeId, IRGraph};
 use crate::scheduling::Step;
+use crate::transformer::analysis::Symbols;
 use crate::transformer::ir_gen::ValueSource;
 
 /// Minimum character width for the comment start such that at least the ending "// returns: [..."
@@ -23,7 +24,8 @@ pub fn validate_format_params(comment_start: usize, indent: usize) -> Option<Str
 
 pub fn format_with_stack_comments(
     func: &Function,
-    nodes: &[CompNode],
+    symbols: &Symbols,
+    graph: &IRGraph,
     sources: &[ValueSource],
     assignments: &[(String, CompNodeId)],
     steps: Vec<Step>,
@@ -37,7 +39,7 @@ pub fn format_with_stack_comments(
             .iter()
             .map(|spanned| spanned.inner.clone())
             .collect::<Vec<String>>()
-            .join(","),
+            .join(", "),
         func.inputs.len(),
         func.outputs.len()
     );
@@ -62,15 +64,17 @@ pub fn format_with_stack_comments(
 
     for step in steps {
         let op_repr = match step {
-            Step::Comp(id) => sources[id].huff_repr(),
+            Step::Comp(id, as_variant) => sources[id].huff_repr(symbols, as_variant),
             Step::Dup(depth) => format!("dup{}", depth),
             Step::Swap(depth) => format!("swap{}", depth),
             Step::Pop => "pop".into(),
         };
+        // TODO: Generalize
+        let op_repr = if op_repr == "diff" { "sub" } else { &op_repr };
         match step {
-            Step::Comp(id) => {
+            Step::Comp(id, _) => {
                 let mut args = vec![];
-                let node = &nodes[id];
+                let node = &graph.nodes[id];
                 for _ in 0..node.operands.len() {
                     args.push(stack.pop().expect("Invalid instruction sequence"));
                 }
@@ -90,10 +94,10 @@ pub fn format_with_stack_comments(
                                         .map(MacroArg::balls_repr)
                                         .collect::<Vec<String>>()
                                         .join(", "),
-                                    args.join(",")
+                                    args.join(", ")
                                 )
                             }
-                            ValueSource::Op(ident) => format!("{}({})", ident, args.join(",")),
+                            ValueSource::Op(_) => format!("{}({})", op_repr, args.join(", ")),
                             ValueSource::MacroArg(arg) => arg.balls_repr(),
                             ValueSource::HuffConst(ident) => ident.clone(),
                             ValueSource::TopLevelInput(_) => panic!(
@@ -115,6 +119,7 @@ pub fn format_with_stack_comments(
                 stack.pop();
             }
         }
+
         let lone_line = format!("{indent}{}", op_repr);
         let stack_repr = if stack.len() > 17 {
             format!("[..., {}]", stack[stack.len() - 17..].join(", "))

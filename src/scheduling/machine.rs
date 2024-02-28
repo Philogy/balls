@@ -1,5 +1,5 @@
 use crate::scheduling::actions::Action;
-use crate::scheduling::ir::{CompNode, CompNodeId};
+use crate::scheduling::ir::{CompNode, CompNodeId, IRGraph};
 use crate::scheduling::Step;
 use crate::scheduling::Swapper;
 use crate::Searchable;
@@ -8,6 +8,17 @@ use crate::Searchable;
 pub struct ScheduleInfo<'a> {
     pub nodes: &'a [CompNode],
     pub target_input_stack: &'a [CompNodeId],
+    pub variants: &'a [Option<Vec<usize>>],
+}
+
+impl<'a> From<&'a IRGraph> for ScheduleInfo<'a> {
+    fn from(graph: &'a IRGraph) -> Self {
+        Self {
+            nodes: graph.nodes.as_slice(),
+            target_input_stack: graph.input_ids.as_slice(),
+            variants: graph.variants.as_slice(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
@@ -52,7 +63,9 @@ impl BackwardsMachine {
     ) -> Result<bool, String> {
         match action {
             Action::Unpop(id) => self.unpop(info, id, steps),
-            Action::UndoComp(id, stack_idx) => self.undo_comp(info, id, stack_idx, steps),
+            Action::UndoComp(id, stack_idx, undoing_as_variant) => {
+                self.undo_comp(info, id, stack_idx, steps, undoing_as_variant)
+            }
             Action::UndoEffect(id) => self.undo_effect(info, id, steps),
             Action::Dedup(as_top_idx, other_idx) => self.dedup(info, as_top_idx, other_idx, steps),
         };
@@ -105,6 +118,7 @@ impl BackwardsMachine {
         id: CompNodeId,
         stack_idx: usize,
         steps: &mut Vec<Step>,
+        undoing_as_variant: bool,
     ) {
         // Check that we're actually able to undo.
         debug_assert_eq!(
@@ -134,8 +148,8 @@ impl BackwardsMachine {
         if depth > 0 {
             steps.push(Step::Swap(depth));
         }
-        self._undo_node(info, id);
-        steps.push(Step::Comp(id));
+        self._undo_node(info, id, undoing_as_variant);
+        steps.push(Step::Comp(id, undoing_as_variant));
     }
 
     fn undo_effect(&mut self, info: ScheduleInfo, id: CompNodeId, steps: &mut Vec<Step>) {
@@ -151,8 +165,8 @@ impl BackwardsMachine {
             id
         );
         self.blocked_by[id] = None;
-        self._undo_node(info, id);
-        steps.push(Step::Comp(id));
+        self._undo_node(info, id, false);
+        steps.push(Step::Comp(id, false));
     }
 
     fn dedup(
@@ -222,15 +236,29 @@ impl BackwardsMachine {
         }
     }
 
-    fn _undo_node(&mut self, info: ScheduleInfo, id: CompNodeId) {
-        for dep_id in info.nodes[id].operands.iter().rev() {
+    fn _undo_node(&mut self, info: ScheduleInfo, id: CompNodeId, undoing_as_variant: bool) {
+        let mut push_to_stack = |dep_id: &usize| {
             self.stack.push(*dep_id);
             self.blocked_by[*dep_id].as_mut().map(|b| *b -= 1);
+            // Can mark operand as "done" if its blocked count is 0 and we know it doesn't need to
+            // be undone because it's on the target input stack.
             if self.blocked_by[*dep_id].unwrap() == 0 && info.target_input_stack.contains(dep_id) {
                 debug_assert_eq!(self.stack.iter().total(dep_id), 1);
                 self.blocked_by[*dep_id] = None;
             }
+        };
+
+        if undoing_as_variant {
+            let operands: Vec<_> = info.nodes[id].operands.iter().rev().collect();
+            info.variants[id]
+                .as_ref()
+                .expect("undoing_as_variant flag without variant")
+                .iter()
+                .for_each(|op_index| push_to_stack(operands[*op_index]));
+        } else {
+            info.nodes[id].operands.iter().rev().for_each(push_to_stack);
         }
+
         for pre_id in info.nodes[id].post.iter() {
             self.blocked_by[*pre_id].as_mut().map(|b| *b -= 1);
         }

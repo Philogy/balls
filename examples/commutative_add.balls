@@ -1,0 +1,3 @@
+fn DUMB_ADD() [x, y] -> [z] {
+    z = sub(x, y)
+}

@@ -375,10 +375,36 @@ pub fn validate_and_get_symbols(nodes: Vec<Spanned<Ast>>) -> Result<Symbols, Vec
             .insert(dep.into(), Spanned::new(Symbol::Dependency, 0..0))
             .map(|_| panic!("Duplicate symbol from std_lib"));
     }
-    for op in std_ops {
+    for op in &std_ops {
         symbols
-            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op), 0..0))
+            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op.clone()), 0..0))
             .map(|_| panic!("Duplicate symbol from std_lib"));
+    }
+    for op in std_ops {
+        if let Some((other_ident, _)) = &op.other {
+            match symbols.get(other_ident) {
+                Some(Spanned {
+                    inner: Symbol::Op(other_op),
+                    ..
+                }) => {
+                    assert!(
+                        op.stack_in == other_op.stack_in && op.stack_out == op.stack_out,
+                        "Mismatching variant op in std_ops {:?} vs. {:?}",
+                        op,
+                        other_op
+                    );
+                    assert!(
+                        op.stack_out,
+                        "std_ops marked non-outputing opcode as having variant {:?}",
+                        op
+                    );
+                }
+                _ => panic!(
+                    "Variant op from std_ops not found or is not an op symbol: {}",
+                    other_ident
+                ),
+            }
+        }
     }
 
     let mut errors: Vec<SemanticError> = nodes

@@ -7,7 +7,7 @@ extern _NONCES_SLOT()  stack(1, 1)
 
 fn PERMIT(z0) [error] -> [] {
     // Load calldata.
-    owner = _LOAD_ADDRESS<z0>()
+    owner = _LOAD_ADDRESS<0x10>()
     spender = _LOAD_ADDRESS<0x30>()
     amount = calldataload(0x44)
     deadline = calldataload(0x64)

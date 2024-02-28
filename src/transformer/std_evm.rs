@@ -1,5 +1,3 @@
-use crate::parser::Spanned;
-
 #[derive(Clone, Debug)]
 pub struct Op {
     pub ident: String,
@@ -7,6 +5,7 @@ pub struct Op {
     pub stack_out: bool,
     pub reads: Vec<String>,
     pub writes: Vec<String>,
+    pub other: Option<(String, Vec<usize>)>,
 }
 
 impl Op {
@@ -23,11 +22,52 @@ impl Op {
             stack_out,
             reads: reads.into_iter().map(|s| s.to_string()).collect(),
             writes: writes.into_iter().map(|s| s.to_string()).collect(),
+            other: None,
         }
     }
 
     fn pure(ident: &str, stack_in: u16, stack_out: bool) -> Self {
         Self::new(ident, stack_in, stack_out, vec![], vec![])
+    }
+
+    /// Commutative function with two arguments, implicitly pure (no reads/writes)
+    fn two_comm(ident: &str) -> Self {
+        Self {
+            ident: ident.to_string(),
+            stack_in: 2,
+            stack_out: true,
+            reads: vec![],
+            writes: vec![],
+            other: Some((ident.to_string(), vec![1, 0])),
+        }
+    }
+
+    fn chiral(ident: &str, other: &str, stack_in: u16, indices: Vec<usize>) -> Self {
+        assert!(
+            indices.len() == stack_in.into(),
+            "Indices {:?} stack_in {} mismatch",
+            indices,
+            stack_in
+        );
+        let mut was_found = vec![false; stack_in.into()];
+        for i in &indices {
+            *was_found
+                .get_mut(*i)
+                .unwrap_or_else(|| panic!("Invalid operand index {}", i)) = true;
+        }
+        assert!(
+            was_found.iter().all(|b| *b),
+            "Duplicate indicies in {:?}",
+            indices
+        );
+        Self {
+            ident: ident.to_string(),
+            stack_in,
+            stack_out: true,
+            reads: vec![],
+            writes: vec![],
+            other: Some((other.to_string(), indices)),
+        }
     }
 }
 
@@ -47,26 +87,29 @@ pub fn get_standard_opcodes_and_deps() -> (Vec<&'static str>, Vec<Op>) {
         ////////////////////////////////////////////////////////////////,
         //                          PURE OPS                          //,
         ////////////////////////////////////////////////////////////////,
-        Op::pure("add", 2, true),
-        Op::pure("mul", 2, true),
+        Op::two_comm("add"),
+        Op::two_comm("mul"),
         Op::pure("sub", 2, true),
         Op::pure("div", 2, true),
         Op::pure("sdiv", 2, true),
         Op::pure("mod", 2, true),
         Op::pure("smod", 2, true),
-        Op::pure("addmod", 3, true),
-        Op::pure("mulmod", 3, true),
+        Op::chiral("addmod", "addmod", 3, vec![1, 0, 2]),
+        Op::chiral("mulmod", "mulmod", 3, vec![1, 0, 2]),
         Op::pure("exp", 2, true),
         Op::pure("signextend", 2, true),
-        Op::pure("lt", 2, true),
-        Op::pure("gt", 2, true),
-        Op::pure("slt", 2, true),
-        Op::pure("sgt", 2, true),
-        Op::pure("eq", 2, true),
+        Op::chiral("lt", "gt", 2, vec![1, 0]),
+        Op::chiral("gt", "lt", 2, vec![1, 0]),
+        Op::chiral("slt", "sgt", 2, vec![1, 0]),
+        Op::chiral("sgt", "slt", 2, vec![1, 0]),
+        Op::two_comm("eq"),
         Op::pure("iszero", 1, true),
-        Op::pure("and", 2, true),
-        Op::pure("or", 2, true),
-        Op::pure("xor", 2, true),
+        Op::two_comm("and"),
+        Op::two_comm("or"),
+        Op::two_comm("xor"),
+        // Aliased into sub in the huff formatter,
+        // TODO: Generalize
+        Op::two_comm("diff"),
         Op::pure("not", 1, true),
         Op::pure("byte", 2, true),
         Op::pure("shl", 2, true),

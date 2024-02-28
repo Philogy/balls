@@ -2,7 +2,6 @@ use balls::huff_formatter;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
 use balls::scheduling::schedulers::{Dijkstra, Guessooor};
-use balls::scheduling::{BackwardsMachine, ScheduleInfo};
 use balls::transformer::analysis::{validate_and_get_symbols, Symbol, Symbols};
 use balls::transformer::ir_gen::gen_ir;
 use balls::TimeDelta;
@@ -123,7 +122,8 @@ fn main() {
 
                 let output = huff_formatter::format_with_stack_comments(
                     func,
-                    ir_graph.nodes.as_slice(),
+                    &symbols,
+                    &ir_graph,
                     value_sources.as_slice(),
                     assignments.as_slice(),
                     steps,

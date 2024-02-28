@@ -29,4 +29,5 @@ pub struct IRGraph {
     pub input_ids: Vec<CompNodeId>,
     pub output_ids: Vec<CompNodeId>,
     pub nodes: Vec<CompNode>,
+    pub variants: Vec<Option<Vec<usize>>>,
 }

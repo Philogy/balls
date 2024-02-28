@@ -7,7 +7,7 @@ pub enum Action {
     Unpop(CompNodeId),
     Dedup(usize, usize),
     UndoEffect(CompNodeId),
-    UndoComp(CompNodeId, usize),
+    UndoComp(CompNodeId, usize, bool),
 }
 
 pub fn get_actions<'a>(
@@ -36,24 +36,32 @@ pub fn get_actions<'a>(
             })
         })
         .chain(unpoppable.clone().into_iter().map(Action::Unpop))
-        .chain((0..info.nodes.len()).filter_map(move |id| {
-            if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
-                return None;
-            }
-            if info.nodes[id].produces_value {
-                let idx = machine.stack.iter().index_of(&id).unwrap_or_else(|| {
-                    panic!(
+        .chain(
+            (0..info.nodes.len())
+                .filter_map(move |id| {
+                    if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
+                        return None;
+                    }
+                    if info.nodes[id].produces_value {
+                        let idx = machine.stack.iter().index_of(&id).unwrap_or_else(|| {
+                            panic!(
                         "Not-yet-done, comp node with 0 blocks not on stack (id: {}, stack: {:?})",
                         id, machine.stack
                     )
-                });
-                if idx < machine.stack.len().checked_sub(17).unwrap_or(0) {
-                    None
-                } else {
-                    Some(Action::UndoComp(id, idx))
-                }
-            } else {
-                Some(Action::UndoEffect(id))
-            }
-        }))
+                        });
+                        if idx < machine.stack.len().checked_sub(17).unwrap_or(0) {
+                            None
+                        } else {
+                            let mut undos = vec![Action::UndoComp(id, idx, false)];
+                            if let Some(_) = &info.variants[id] {
+                                undos.push(Action::UndoComp(id, idx, true));
+                            }
+                            Some(undos)
+                        }
+                    } else {
+                        Some(vec![Action::UndoEffect(id)])
+                    }
+                })
+                .flatten(),
+        )
 }

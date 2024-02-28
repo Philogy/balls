@@ -173,10 +173,7 @@ pub trait AStarScheduler: Sized {
         let mut tracker = SchedulingTracker::default();
 
         let mut queue: ScheduleQueue = BinaryHeap::new();
-        let info = ScheduleInfo {
-            nodes: graph.nodes.as_slice(),
-            target_input_stack: graph.input_ids.as_slice(),
-        };
+        let info = ScheduleInfo::from(graph);
         let start = BackwardsMachine::new(
             graph.output_ids.clone(),
             graph.nodes.iter().map(|node| node.blocked_by).collect(),
