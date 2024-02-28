@@ -1,10 +1,10 @@
 use balls::huff_formatter;
-use balls::inject_std::get_std;
 use balls::parser::{error_printing::print_errors, lexer, parser, types::resolve_span_span};
 use balls::scheduling::astar::AStarScheduler;
 use balls::scheduling::schedulers::{Dijkstra, Guessooor};
 use balls::scheduling::{BackwardsMachine, ScheduleInfo};
-use balls::transformer::GlobalContext;
+use balls::transformer::analysis::{validate_and_get_symbols, Symbol, Symbols};
+use balls::transformer::ir_gen::gen_ir;
 use balls::TimeDelta;
 use clap::Parser;
 use std::time::Instant;
@@ -36,9 +36,6 @@ struct Cli {
 
     #[clap(short, long, default_value_t = 1024)]
     max_stack_depth: usize,
-
-    #[clap(short, long)]
-    show: bool,
 
     #[clap(short, long, help = "The path to which to write the output")]
     output_path: Option<String>,
@@ -101,40 +98,34 @@ fn main() {
     }
     let parse_lex_time = start.elapsed().as_secs_f64();
 
-    if let Some(mut ast_nodes) = maybe_ast_nodes {
-        ast_nodes.extend(get_std());
-
-        let ctx = GlobalContext::from(ast_nodes);
+    if let Some(ast_nodes) = maybe_ast_nodes {
+        let symbols: Symbols = validate_and_get_symbols(ast_nodes).unwrap();
 
         let mut ball_macros: Vec<String> = Vec::new();
 
-        let schedule_summaries: Vec<_> = ctx
-            .macros
-            .iter()
-            .map(|macro_def| {
-                let tmacro = ctx.transform(macro_def.clone());
-                if args.show {
-                    tmacro.show_comps();
-                }
+        let schedule_summaries: Vec<_> = symbols
+            .values()
+            .filter_map(|symbol| match &symbol.inner {
+                Symbol::Function(func) => Some(func),
+                _ => None,
+            })
+            .map(|func| {
+                let (ir_graph, value_sources, assignments) = gen_ir(func, &symbols);
 
                 let start = Instant::now();
-                let machine: BackwardsMachine = tmacro.clone().into();
                 let preprocessing_time = start.elapsed().as_secs_f64();
 
-                let nodes: Vec<_> = tmacro.nodes.iter().map(|(node, _)| node.clone()).collect();
-
-                let info = ScheduleInfo {
-                    nodes: nodes.as_slice(),
-                    target_input_stack: tmacro.input_ids.as_slice(),
-                };
                 let (steps, tracker) = if args.dijkstra {
-                    Dijkstra.schedule(info, machine, args.max_stack_depth)
+                    Dijkstra.schedule(&ir_graph, args.max_stack_depth)
                 } else {
-                    Guessooor::new(args.guess).schedule(info, machine, args.max_stack_depth)
+                    Guessooor::new(args.guess).schedule(&ir_graph, args.max_stack_depth)
                 };
 
                 let output = huff_formatter::format_with_stack_comments(
-                    &tmacro,
+                    func,
+                    ir_graph.nodes.as_slice(),
+                    value_sources.as_slice(),
+                    assignments.as_slice(),
                     steps,
                     args.comment,
                     args.indent,
@@ -142,7 +133,7 @@ fn main() {
 
                 ball_macros.push(output);
 
-                (tmacro.name, tracker, preprocessing_time)
+                (func.ident.clone(), tracker, preprocessing_time)
             })
             .collect();
 

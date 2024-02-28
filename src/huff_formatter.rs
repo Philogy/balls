@@ -1,6 +1,7 @@
-use crate::comp_graph::Computation;
+use crate::parser::ast::{Function, MacroArg};
+use crate::scheduling::ir::{CompNode, CompNodeId};
 use crate::scheduling::Step;
-use crate::transformer::TransformedMacro;
+use crate::transformer::ir_gen::ValueSource;
 
 /// Minimum character width for the comment start such that at least the ending "// returns: [..."
 /// is nicely formatted.
@@ -18,29 +19,36 @@ pub fn validate_format_params(comment_start: usize, indent: usize) -> Option<Str
     }
 }
 
+// Huff macro arguments can be: opcodes, constants, macro_args
+
 pub fn format_with_stack_comments(
-    tmacro: &TransformedMacro,
+    func: &Function,
+    nodes: &[CompNode],
+    sources: &[ValueSource],
+    assignments: &[(String, CompNodeId)],
     steps: Vec<Step>,
     comment_start: usize,
     indent: usize,
 ) -> String {
     let mut out = format!(
-        "#define macro {}() = takes({}) returns({}) {{\n",
-        tmacro.name,
-        tmacro.input_ids.len(),
-        tmacro.output_ids.len()
+        "#define macro {}({}) = takes({}) returns({}) {{\n",
+        func.ident,
+        func.macro_args
+            .iter()
+            .map(|spanned| spanned.inner.clone())
+            .collect::<Vec<String>>()
+            .join(","),
+        func.inputs.len(),
+        func.outputs.len()
     );
 
     let main_width = comment_start - indent;
     let indent = " ".repeat(indent);
 
-    let mut stack: Vec<String> = tmacro
-        .nodes
+    let mut stack: Vec<String> = func
+        .inputs
         .iter()
-        .filter_map(|(_, comp)| match comp {
-            Computation::TopLevelInput(ident) => Some(ident.clone()),
-            _ => None,
-        })
+        .map(|spanned| spanned.inner.clone())
         .collect();
 
     let line = format!(
@@ -53,42 +61,47 @@ pub fn format_with_stack_comments(
     out.push('\n');
 
     for step in steps {
-        let step_repr = match step {
-            Step::Op(id) => match &tmacro.nodes[id].1 {
-                Computation::Op(ident) => (ident.clone(), None),
-                Computation::External(ident) => (format!("{}()", ident), Some(ident.clone())),
-                Computation::TopLevelInput(ident) => (ident.clone(), None),
-                Computation::Const(num) => (format!("0x{:x}", num), None),
-            },
-            Step::Dup(depth) => (format!("dup{}", depth), None),
-            Step::Swap(depth) => (format!("swap{}", depth), None),
-            Step::Pop => ("pop".into(), None),
+        let op_repr = match step {
+            Step::Comp(id) => sources[id].huff_repr(),
+            Step::Dup(depth) => format!("dup{}", depth),
+            Step::Swap(depth) => format!("swap{}", depth),
+            Step::Pop => "pop".into(),
         };
-        let main_repr = step_repr.0;
-        let value_repr = step_repr.1.as_ref().unwrap_or(&main_repr);
         match step {
-            Step::Op(id) => {
+            Step::Comp(id) => {
                 let mut args = vec![];
-                let node = &tmacro.nodes[id].0;
+                let node = &nodes[id];
                 for _ in 0..node.operands.len() {
                     args.push(stack.pop().expect("Invalid instruction sequence"));
                 }
-                let assignment = tmacro
-                    .assignments
+                let assignment = assignments
                     .iter()
                     .find(|(_, statement_id)| *statement_id == id);
-                match (assignment, node.has_output) {
-                    (Some((ident, _)), true) => {
-                        stack.push(ident.clone());
-                    }
-                    (None, true) => match args.len() {
-                        0 => stack.push(value_repr.clone()),
-                        _ => stack.push(format!("{}({})", value_repr, args.join(", "))),
-                    },
-                    (None, false) => {
-                        // No variable and output, which is consistent, add nothing to the stack.
-                    }
-                    _ => panic!("Found assignment but comp node.has_output reported as f"),
+                if node.produces_value {
+                    let value_repr = match assignment {
+                        Some((ident, _)) => ident.clone(),
+                        None => match &sources[id] {
+                            ValueSource::MacroInvoke(ident, macro_args) => {
+                                format!(
+                                    "{}<{}>({})",
+                                    ident,
+                                    macro_args
+                                        .iter()
+                                        .map(MacroArg::balls_repr)
+                                        .collect::<Vec<String>>()
+                                        .join(", "),
+                                    args.join(",")
+                                )
+                            }
+                            ValueSource::Op(ident) => format!("{}({})", ident, args.join(",")),
+                            ValueSource::MacroArg(arg) => arg.balls_repr(),
+                            ValueSource::HuffConst(ident) => ident.clone(),
+                            ValueSource::TopLevelInput(_) => panic!(
+                                "Invalid instruction sequence, top-level-input cannot be comp"
+                            ),
+                        },
+                    };
+                    stack.push(value_repr);
                 }
             }
             Step::Dup(depth) => {
@@ -102,7 +115,7 @@ pub fn format_with_stack_comments(
                 stack.pop();
             }
         }
-        let lone_line = format!("{indent}{}", main_repr);
+        let lone_line = format!("{indent}{}", op_repr);
         let stack_repr = if stack.len() > 17 {
             format!("[..., {}]", stack[stack.len() - 17..].join(", "))
         } else {

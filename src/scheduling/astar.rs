@@ -1,4 +1,5 @@
 use super::actions::get_actions;
+use crate::scheduling::ir::IRGraph;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::CommaSeparatable;
 use crate::TimeDelta;
@@ -166,13 +167,20 @@ impl Hasher for NoopHasher {
 pub trait AStarScheduler: Sized {
     fn schedule(
         mut self,
-        info: ScheduleInfo,
-        start: BackwardsMachine,
+        graph: &IRGraph,
         max_stack_depth: usize,
     ) -> (Vec<Step>, SchedulingTracker) {
         let mut tracker = SchedulingTracker::default();
 
         let mut queue: ScheduleQueue = BinaryHeap::new();
+        let info = ScheduleInfo {
+            nodes: graph.nodes.as_slice(),
+            target_input_stack: graph.input_ids.as_slice(),
+        };
+        let start = BackwardsMachine::new(
+            graph.output_ids.clone(),
+            graph.nodes.iter().map(|node| node.blocked_by).collect(),
+        );
         let est_capacity = self.estimate_explored_map_size(info, &start);
         let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Default::default());
@@ -203,6 +211,7 @@ pub trait AStarScheduler: Sized {
 
                 let explored_size = explored.len();
 
+                // TODO: Use arena allocator to be able to more efficiently drop the allocations.
                 // Degen: Purposefully leak the data structures as it takes *a lot* of time to
                 // properly drop and clear.
                 std::mem::forget(explored);
@@ -212,7 +221,7 @@ pub trait AStarScheduler: Sized {
                 return (all_steps, tracker);
             }
 
-            // 2b. Not at the end explore all possible neighbours.
+            // 2b. Not at the end so we explore all possible neighbours.
             for action in get_actions(info, &node.state) {
                 let mut new_state = node.state.clone();
                 let mut steps = vec![];

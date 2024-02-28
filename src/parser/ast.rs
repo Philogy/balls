@@ -1,46 +1,73 @@
 use std::boxed::Box;
 
-use crate::parser::types::{Ident, Spanned};
+use crate::parser::types::Spanned;
 use num_bigint::BigUint;
+
+#[derive(Clone, Debug)]
+pub enum MacroArg {
+    ArgRef(String),
+    Num(BigUint),
+}
+
+impl MacroArg {
+    pub fn huff_repr(&self) -> String {
+        match self {
+            Self::Num(num) => format!("0x{:x}", num),
+            Self::ArgRef(ident) => format!("<{}>", ident),
+        }
+    }
+
+    pub fn balls_repr(&self) -> String {
+        match self {
+            Self::Num(num) => format!("0x{:x}", num),
+            Self::ArgRef(ident) => format!("{}", ident),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Expr {
     Call {
-        name: Spanned<Ident>,
-        args: Spanned<Box<Vec<Spanned<Expr>>>>,
+        ident: Spanned<String>,
+        macro_args: Spanned<Vec<Spanned<MacroArg>>>,
+        stack_args: Spanned<Box<Vec<Spanned<Expr>>>>,
     },
-    Var(Ident),
+    Var(String),
     Num(BigUint),
 }
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    pub ident: Option<Spanned<Ident>>,
+    pub ident: Option<Spanned<String>>,
     pub expr: Spanned<Expr>,
 }
 
 #[derive(Clone, Debug)]
-pub struct OpDefinition {
-    pub name: Ident,
-    pub external: bool,
+pub struct HuffMacro {
+    pub ident: String,
+    pub macro_args: Vec<Spanned<String>>,
     pub stack_in: u16,
     pub stack_out: u16,
-    pub reads: Vec<Ident>,
-    pub writes: Vec<Ident>,
+    pub reads: Vec<Spanned<String>>,
+    pub writes: Vec<Spanned<String>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Macro {
-    pub name: Ident,
-    pub inputs: Vec<Ident>,
-    pub outputs: Vec<Ident>,
+pub struct Function {
+    pub ident: String,
+    pub macro_args: Vec<Spanned<String>>,
+    pub inputs: Vec<Spanned<String>>,
+    pub outputs: Vec<Spanned<String>>,
     pub body: Vec<Statement>,
+    pub reads: Vec<Spanned<String>>,
+    pub writes: Vec<Spanned<String>>,
 }
 
 #[derive(Clone, Debug)]
 pub enum Ast {
-    Macro(Macro),
-    OpDef(OpDefinition),
-    Dependency(Ident),
+    Dependency(String),
+    Const(String),
+    Function(Function),
+    HuffMacro(HuffMacro),
     Error,
 }

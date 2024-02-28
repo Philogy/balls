@@ -1,13 +1,14 @@
-#define op _PERMIT_TYPEHASH = extern stack(0, 1)
-#define op _CACHED_DOMAIN_SEP = extern stack(0, 1)
-#define op _LOAD_ADDRESS = extern stack(1, 1)
-#define op _REQUIRE_NOT = extern stack(1, 0) reads(CONTROL_FLOW)
-#define op _NONCES_SLOT = extern stack(1, 1)
+const PERMIT_TYPEHASH
+const CACHED_DOMAIN_SEP
 
-#define macro PERMIT = [error] -> {
+extern _LOAD_ADDRESS(offset) stack(0, 1)
+extern _REQUIRE_NOT() stack(1, 0) reads(CONTROL_FLOW)
+extern _NONCES_SLOT()  stack(1, 1)
+
+fn PERMIT(z0) [error] -> [] {
     // Load calldata.
-    owner = _LOAD_ADDRESS(0x10)
-    spender = _LOAD_ADDRESS(0x30)
+    owner = _LOAD_ADDRESS<z0>()
+    spender = _LOAD_ADDRESS<0x30>()
     amount = calldataload(0x44)
     deadline = calldataload(0x64)
 
@@ -20,7 +21,7 @@
     deadline_invalid = gt(timestamp(), deadline)
 
     // Compute permit hash.
-    mstore(msize(), _PERMIT_TYPEHASH())
+    mstore(msize(), PERMIT_TYPEHASH)
     mstore(msize(), owner)
     mstore(msize(), spender)
     mstore(msize(), amount)
@@ -34,7 +35,7 @@
 
     // Compute ERC712 hash (weird offset such that 0x21..0x40 is cleared for signature).
     mstore(0x21, 0x1901)
-    mstore(0x41, _CACHED_DOMAIN_SEP())
+    mstore(0x41, CACHED_DOMAIN_SEP)
     mstore(0x61, permit_hash)
     message_hash = sha3(0x3f, 0x42)
 
@@ -58,4 +59,4 @@
     )
 
     stop()
-} -> []
+}

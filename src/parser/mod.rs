@@ -6,4 +6,4 @@ pub mod tokens;
 pub mod types;
 mod utils;
 
-pub(crate) use types::{Ident, Spanned};
+pub(crate) use types::Spanned;

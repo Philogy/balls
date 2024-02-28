@@ -1,8 +1,7 @@
-use crate::comp_graph::{CompNode, CompNodeId};
 use crate::scheduling::actions::Action;
+use crate::scheduling::ir::{CompNode, CompNodeId};
 use crate::scheduling::Step;
 use crate::scheduling::Swapper;
-use crate::transformer::TransformedMacro;
 use crate::Searchable;
 
 #[derive(Debug, Clone, Copy)]
@@ -11,7 +10,7 @@ pub struct ScheduleInfo<'a> {
     pub target_input_stack: &'a [CompNodeId],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub struct BackwardsMachine {
     pub stack: Vec<CompNodeId>,
     /// Amount of post dependencies and dependent contracts before the given node can be marked as
@@ -30,6 +29,13 @@ impl Ord for BackwardsMachine {
 const MAX_VALID_SWAP_DEPTH: usize = 16;
 
 impl BackwardsMachine {
+    pub fn new(end_stack: Vec<CompNodeId>, blocked_by: Vec<Option<u32>>) -> Self {
+        Self {
+            stack: end_stack,
+            blocked_by,
+        }
+    }
+
     pub fn all_done(&self) -> bool {
         self.blocked_by.iter().all(|b| b.is_none())
     }
@@ -129,12 +135,12 @@ impl BackwardsMachine {
             steps.push(Step::Swap(depth));
         }
         self._undo_node(info, id);
-        steps.push(Step::Op(id));
+        steps.push(Step::Comp(id));
     }
 
     fn undo_effect(&mut self, info: ScheduleInfo, id: CompNodeId, steps: &mut Vec<Step>) {
         debug_assert!(
-            !info.nodes[id].has_output,
+            !info.nodes[id].produces_value,
             "Attempting to undo node as effect which has output (id: {})",
             id
         );
@@ -146,7 +152,7 @@ impl BackwardsMachine {
         );
         self.blocked_by[id] = None;
         self._undo_node(info, id);
-        steps.push(Step::Op(id));
+        steps.push(Step::Comp(id));
     }
 
     fn dedup(
@@ -228,112 +234,5 @@ impl BackwardsMachine {
         for pre_id in info.nodes[id].post.iter() {
             self.blocked_by[*pre_id].as_mut().map(|b| *b -= 1);
         }
-    }
-}
-
-impl From<TransformedMacro> for BackwardsMachine {
-    fn from(tmacro: TransformedMacro) -> Self {
-        let nodes = tmacro.nodes.len();
-
-        let mut blocked_by = vec![0u32; nodes];
-        let mut stack_count = vec![0u32; nodes];
-
-        for (node, _) in tmacro.nodes.iter() {
-            for post_id in node.post.iter() {
-                blocked_by[*post_id] += 1;
-            }
-            for dep_id in node.operands.iter() {
-                // Blocked once as an argument.
-                blocked_by[*dep_id] += 1;
-                stack_count[*dep_id] += 1;
-            }
-        }
-
-        for output_id in tmacro.output_ids.iter() {
-            stack_count[*output_id] += 1;
-        }
-
-        let stack = tmacro.output_ids;
-
-        for id in 0..nodes {
-            let required_dedups = stack_count[id].max(1) - 1;
-            blocked_by[id] += required_dedups;
-        }
-
-        let blocked_by = blocked_by
-            .into_iter()
-            .enumerate()
-            .map(|(id, blocked)| {
-                if blocked == 0 && tmacro.input_ids.contains(&id) && stack.contains(&id) {
-                    None
-                } else {
-                    Some(blocked)
-                }
-            })
-            .collect();
-
-        Self { stack, blocked_by }
-    }
-}
-
-impl std::hash::Hash for BackwardsMachine {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.stack.hash(state);
-        self.blocked_by.hash(state);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_unpop() {
-        let nodes = vec![
-            CompNode::lone(0, true),
-            CompNode::lone(1, true),
-            CompNode::lone(2, true),
-            CompNode::new(3, true, vec![0, 1], vec![]),
-        ];
-        let target_input_stack = vec![2, 1, 0];
-        let info = ScheduleInfo {
-            nodes: nodes.as_slice(),
-            target_input_stack: target_input_stack.as_slice(),
-        };
-        let mut machine = BackwardsMachine {
-            stack: vec![3],
-            blocked_by: vec![Some(1), Some(1), Some(0), Some(0)],
-        };
-
-        dbg!(&machine);
-
-        machine.apply(info, Action::Unpop(2), &mut vec![]);
-
-        dbg!(&machine);
-    }
-
-    #[test]
-    fn test_undo_comp() {
-        let nodes = vec![
-            CompNode::lone(0, true),
-            CompNode::lone(1, true),
-            CompNode::lone(2, true),
-            CompNode::new(3, true, vec![0, 1], vec![]),
-        ];
-        let target_input_stack = vec![2, 1, 0];
-        let info = ScheduleInfo {
-            nodes: nodes.as_slice(),
-            target_input_stack: target_input_stack.as_slice(),
-        };
-        let mut machine = BackwardsMachine {
-            stack: vec![2, 3],
-            blocked_by: vec![Some(1), Some(1), Some(0), Some(0)],
-        };
-
-        dbg!(&machine);
-
-        machine.apply(info, Action::UndoComp(3, 1), &mut vec![]);
-
-        dbg!(&machine);
     }
 }

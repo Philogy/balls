@@ -1,21 +1,19 @@
-use crate::parser::types::Ident;
 use num_bigint::BigUint;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Token {
-    // ============= Core =============
-    Define,
     // ====== Top-level Keywords ======
+    Fn,
     Op,
     Dependency,
-    Macro,
+    External,
+    Const,
     // ========= Sub Keywords =========
     Stack,
     Reads,
     Writes,
-    External,
     // ============ Atoms =============
-    Ident(Ident),
+    Ident(String),
     Number(BigUint),
     // =========== Symbols ============
     Arrow,

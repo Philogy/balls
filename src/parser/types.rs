@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-pub type Ident = String;
-
 pub type Span = std::ops::Range<usize>;
 
 #[derive(Debug, Clone)]
@@ -16,6 +14,14 @@ impl<T: Debug + Clone> Spanned<T> {
         F: FnOnce(T) -> U,
     {
         Spanned::new(f(self.inner), self.span)
+    }
+
+    pub fn unwrap(self) -> T {
+        self.inner
+    }
+
+    pub fn unwrap_ref(&self) -> &T {
+        &self.inner
     }
 }
 

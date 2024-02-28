@@ -18,11 +18,12 @@ fn keyword(literal: &'static str, token: Token) -> impl Parser<char, Token, Erro
 fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
     keyword("op", Token::Op)
         .or(keyword("dependency", Token::Dependency))
-        .or(keyword("macro", Token::Macro))
+        .or(keyword("fn", Token::Fn))
         .or(keyword("stack", Token::Stack))
         .or(keyword("reads", Token::Reads))
         .or(keyword("writes", Token::Writes))
         .or(keyword("extern", Token::External))
+        .or(keyword("const", Token::Const))
 }
 
 fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
@@ -83,9 +84,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .padded()
         .labelled("comment");
 
-    let define = text("#define", Token::Define, "define");
-
-    let token = define.or(keywords()).or(symbols()).or(number()).or(ident());
+    let token = keywords().or(symbols()).or(number()).or(ident());
 
     token
         .map_with_span(Spanned::new)

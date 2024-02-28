@@ -3,17 +3,17 @@ use chumsky::prelude::*;
 use num_bigint::{BigUint, TryFromBigIntError};
 
 use crate::parser::{
-    ast::{Ast, Expr, Macro, OpDefinition, Statement},
+    ast::{Ast, Expr, Function, HuffMacro, MacroArg, Statement},
     tokens::Token,
-    types::{Ident, Spanned},
+    types::Spanned,
 };
 
-fn get_ident() -> impl Parser<Token, Ident, Error = Simple<Token>> {
+fn ident() -> impl Parser<Token, String, Error = Simple<Token>> {
     select! { Token::Ident(ident) => ident }
 }
 
 fn dependency_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
-    just(Token::Dependency).ignore_then(get_ident().map(Ast::Dependency))
+    just(Token::Dependency).ignore_then(ident().map(Ast::Dependency))
 }
 
 fn stack_size() -> impl Parser<Token, u16, Error = Simple<Token>> {
@@ -34,10 +34,13 @@ fn stack_size() -> impl Parser<Token, u16, Error = Simple<Token>> {
     })
 }
 
-fn dependency_list(token: Token) -> impl Parser<Token, Vec<Ident>, Error = Simple<Token>> {
+fn dependency_list(
+    token: Token,
+) -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> {
     just(token)
         .ignore_then(
-            get_ident()
+            ident()
+                .map_with_span(Spanned::new)
                 .list()
                 .delimited_by(just(Token::OpenRound), just(Token::CloseRound)),
         )
@@ -71,61 +74,72 @@ fn recover_for_round_delimited<T>(
     )
 }
 
-fn op_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
-    let op_def_head = just(Token::Op)
-        .ignore_then(get_ident())
-        .then_ignore(just(Token::Assign))
-        .then(just(Token::External).or_not());
-
-    let stack_io = just(Token::Stack).ignore_then(recover_for_round_delimited(
+fn stack_io() -> impl Parser<Token, Result<(u16, u16), ()>, Error = Simple<Token>> {
+    just(Token::Stack).ignore_then(recover_for_round_delimited(
         stack_size()
             .then_ignore(just(Token::Comma))
             .then(stack_size()),
-    ));
+    ))
+}
 
-    let reads_writes = dependency_list(Token::Reads).then(dependency_list(Token::Writes));
+fn interactions() -> impl Parser<
+    Token,
+    Result<(u16, u16, Vec<Spanned<String>>, Vec<Spanned<String>>), ()>,
+    Error = Simple<Token>,
+> {
+    stack_io()
+        .then(dependency_list(Token::Reads))
+        .then(dependency_list(Token::Writes))
+        .map(|((stack_io_res, reads), writes)| {
+            stack_io_res.map(|(stack_in, stack_out)| (stack_in, stack_out, reads, writes))
+        })
+}
 
-    op_def_head.then(stack_io).then(reads_writes).map(
-        |(((name, extern_token), stack_io), (reads, writes))| match stack_io {
-            Ok((stack_in, stack_out)) => Ast::OpDef(OpDefinition {
-                name,
-                external: extern_token.is_some(),
-                stack_in,
-                stack_out,
-                reads,
-                writes,
-            }),
-            Err(()) => Ast::Error,
-        },
-    )
+fn number() -> impl Parser<Token, BigUint, Error = Simple<Token>> {
+    select! { Token::Number(num) => num }.validate(|num, span, emit| {
+        if num.bits() <= 256 {
+            num
+        } else {
+            emit(Simple::custom(
+                span,
+                format!("Expression constant 0x{:x} larger than 32-bytes", num),
+            ));
+            BigUint::from_bytes_le(&[0xff; 32])
+        }
+    })
+}
+
+fn macro_arg() -> impl Parser<Token, MacroArg, Error = Simple<Token>> {
+    ident()
+        .map(MacroArg::ArgRef)
+        .or(number().map(MacroArg::Num))
 }
 
 fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
     recursive(|expr| {
-        let arg_list = expr
+        let macro_args = macro_arg()
+            .map_with_span(Spanned::new)
+            .list()
+            .delimited_by(just(Token::OpenAngle), just(Token::CloseAngle))
+            .or_not()
+            .map_with_span(Spanned::new);
+        let stack_args = expr
             .list()
             .delimited_by(just(Token::OpenRound), just(Token::CloseRound))
             .map(Box::new)
             .map_with_span(Spanned::new);
-        let call = get_ident()
+        let call = ident()
             .map_with_span(Spanned::new)
-            .then(arg_list)
-            .map(|(name, args)| Expr::Call { name, args });
-        let num = select! { Token::Number(num) => num }
-            .validate(|num, span, emit| {
-                if num.bits() <= 256 {
-                    num
-                } else {
-                    emit(Simple::custom(
-                        span,
-                        format!("Expression constant 0x{:x} larger than 32-bytes", num),
-                    ));
-                    BigUint::from_bytes_le(&[0xff; 32])
-                }
-            })
-            .map(Expr::Num);
+            .then(macro_args)
+            .then(stack_args)
+            .map(|((ident, macro_args), stack_args)| Expr::Call {
+                ident,
+                macro_args: macro_args.map(|inner| inner.unwrap_or_default()),
+                stack_args,
+            });
+        let num = number().map(Expr::Num);
 
-        let var = get_ident().map(Expr::Var);
+        let var = ident().map(Expr::Var);
 
         call.or(num).or(var).map_with_span(Spanned::new)
     })
@@ -133,7 +147,7 @@ fn expression() -> impl Parser<Token, Spanned<Expr>, Error = Simple<Token>> {
 
 fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
     // Parses "my_var ="
-    let var_assign = get_ident()
+    let var_assign = ident()
         .then_ignore(just(Token::Assign))
         .or_not()
         .map_with_span(|maybe_var, span| maybe_var.map(|ident| Spanned::new(ident, span)));
@@ -154,56 +168,88 @@ fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
         })
 }
 
-fn stack_parameters() -> impl Parser<Token, Vec<Ident>, Error = Simple<Token>> {
-    get_ident()
+fn stack_parameters() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> {
+    ident()
+        .map_with_span(Spanned::new)
         .list()
         .delimited_by(just(Token::OpenSquare), just(Token::CloseSquare))
 }
 
-fn macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
-    // macro TRANSFER
-    let macro_def = just(Token::Macro)
-        .ignore_then(get_ident())
-        .then_ignore(just(Token::Assign));
+fn function_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
+    // fn TRANSFER
+    let macro_def = just(Token::Fn).ignore_then(ident());
 
-    // [a, b, c]
+    // (arg1, arg2, ...)
+    let macro_args = recover_for_round_delimited(ident().map_with_span(Spanned::new).list());
 
-    // [a, b, c] ->
-    let stack_in = stack_parameters()
+    // reads(...) writes(...)
+    let reads_writes = dependency_list(Token::Reads).then(dependency_list(Token::Writes));
+
+    // [a, b, c] -> [d, e]
+    let stack_in_out = stack_parameters()
         .then_ignore(just(Token::Arrow))
-        .or_default();
+        .then(stack_parameters().or_default());
 
     // { var1 = op(a, ...) ... sstore(x, y)  }
     let body = statement()
         .repeated()
         .delimited_by(just(Token::OpenCurly), just(Token::CloseCurly));
 
-    // -> [result, nice]
-    let stack_out = just(Token::Arrow)
-        .ignore_then(stack_parameters())
-        .or_default();
-
     macro_def
-        .then(stack_in)
+        .then(macro_args)
+        .then(reads_writes)
+        .then(stack_in_out)
         .then(body)
-        .then(stack_out)
-        .map(|(((name, inputs), body), outputs)| {
-            Ast::Macro(Macro {
-                name,
-                inputs,
-                outputs,
-                body,
-            })
+        .map(
+            |((((ident, maybe_macro_args), (reads, writes)), (inputs, outputs)), body)| {
+                maybe_macro_args
+                    .map(|macro_args| {
+                        Ast::Function(Function {
+                            ident,
+                            macro_args,
+                            inputs,
+                            outputs,
+                            body,
+                            reads,
+                            writes,
+                        })
+                    })
+                    .unwrap_or(Ast::Error)
+            },
+        )
+}
+
+fn extern_huff_macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
+    just(Token::External)
+        .ignore_then(ident())
+        .then(recover_for_round_delimited(
+            ident().map_with_span(Spanned::new).list(),
+        ))
+        .then(interactions())
+        .map(|((ident, maybe_macro_args), interactions)| {
+            let macro_args = maybe_macro_args?;
+            let (stack_in, stack_out, reads, writes) = interactions?;
+            Ok(Ast::HuffMacro(HuffMacro {
+                ident,
+                macro_args,
+                stack_in,
+                stack_out,
+                reads,
+                writes,
+            }))
         })
+        .map(|maybe_ast: Result<Ast, ()>| maybe_ast.unwrap_or(Ast::Error))
+}
+
+fn extern_const_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
+    just(Token::Const).ignore_then(ident()).map(Ast::Const)
 }
 
 pub fn parser() -> impl Parser<Token, Vec<Spanned<Ast>>, Error = Simple<Token>> {
-    just(Token::Define)
-        .ignore_then(
-            dependency_definition()
-                .or(op_definition())
-                .or(macro_definition()),
-        )
+    dependency_definition()
+        .or(extern_huff_macro_definition())
+        .or(extern_const_definition())
+        .or(function_definition())
         .map_with_span(Spanned::new)
         .repeated()
         .then_ignore(end())

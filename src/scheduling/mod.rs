@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod astar;
+pub mod ir;
 pub mod machine;
 pub mod schedulers;
 pub mod step;

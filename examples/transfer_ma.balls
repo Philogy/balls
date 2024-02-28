@@ -1,8 +1,8 @@
 // EXTERNAL
-#define op _REQUIRE_NOT = extern stack(1, 0) reads(CONTROL_FLOW)
+extern _REQUIRE_NOT() stack(1, 0) reads(CONTROL_FLOW)
 
 // Define actual code
-#define macro TRANSFER = [error] -> {
+fn TRANSFER(z0) [error] -> [] {
     // Define some variables
     to = calldataload(0x04)
     amount = calldataload(0x24)
@@ -25,14 +25,14 @@
     sstore(to, new_to_bal)
 
     // Return success (1).
-    mstore(returndatasize(), 1)
-    return(returndatasize(), msize())
+    mstore(z0, 1)
+    return(z0, msize())
 }
 
-#define macro BALANCE_OF = [error] -> {
+fn BALANCE_OF(z0) [error] -> [] {
     _REQUIRE_NOT(error)
     owner = calldataload(0x04)
     bal = sload(owner)
-    mstore(callvalue(), bal)
-    return(callvalue(), msize())
+    mstore(z0, bal)
+    return(z0, msize())
 }

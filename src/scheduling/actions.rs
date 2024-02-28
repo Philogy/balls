@@ -1,4 +1,4 @@
-use crate::comp_graph::CompNodeId;
+use crate::scheduling::ir::CompNodeId;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo};
 use crate::Searchable;
 
@@ -17,7 +17,7 @@ pub fn get_actions<'a>(
     let unpoppable: Vec<_> = (0..info.nodes.len())
         .filter(|id| {
             machine.blocked_by[*id] == Some(0)
-                && info.nodes[*id].has_output
+                && info.nodes[*id].produces_value
                 && !machine.stack.contains(id)
         })
         .collect();
@@ -40,7 +40,7 @@ pub fn get_actions<'a>(
             if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
                 return None;
             }
-            if info.nodes[id].has_output {
+            if info.nodes[id].produces_value {
                 let idx = machine.stack.iter().index_of(&id).unwrap_or_else(|| {
                     panic!(
                         "Not-yet-done, comp node with 0 blocks not on stack (id: {}, stack: {:?})",
