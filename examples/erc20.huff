@@ -5,4 +5,48 @@
 }
 
 // balls-insert-start
+#define macro BALANCE_OF(z0) = takes(1) returns(0) {
+    // takes:                      [error]
+    0x4                         // [error, 0x4]
+    calldataload                // [error, owner]
+    sload                       // [error, bal]
+    <z0>                        // [error, bal, z0]
+    mstore                      // [error]
+    _REQUIRE_NOT()              // []
+    msize                       // [msize()]
+    <z0>                        // [msize(), z0]
+    return                      // []
+    // returns:                    []
+}
+
+#define macro TRANSFER(z0) = takes(1) returns(0) {
+    // takes:                      [error]
+    0x1                         // [error, 0x1]
+    <z0>                        // [error, 0x1, z0]
+    mstore                      // [error]
+    0x24                        // [error, 0x24]
+    calldataload                // [error, amount]
+    caller                      // [error, amount, caller()]
+    sload                       // [error, amount, from_bal]
+    dup2                        // [error, amount, from_bal, amount]
+    dup2                        // [error, amount, from_bal, amount, from_bal]
+    sub                         // [error, amount, from_bal, new_from_bal]
+    caller                      // [error, amount, from_bal, new_from_bal, caller()]
+    sstore                      // [error, amount, from_bal]
+    0x4                         // [error, amount, from_bal, 0x4]
+    calldataload                // [error, amount, from_bal, to]
+    dup3                        // [error, amount, from_bal, to, amount]
+    dup2                        // [error, amount, from_bal, to, amount, to]
+    sload                       // [error, amount, from_bal, to, amount, to_bal]
+    add                         // [error, amount, from_bal, to, new_to_bal]
+    swap1                       // [error, amount, from_bal, new_to_bal, to]
+    sstore                      // [error, amount, from_bal]
+    lt                          // [error, insufficient_bal]
+    or                          // [error']
+    _REQUIRE_NOT()              // []
+    msize                       // [msize()]
+    <z0>                        // [msize(), z0]
+    return                      // []
+    // returns:                    []
+}
 // balls-insert-end
