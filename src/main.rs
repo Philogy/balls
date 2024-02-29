@@ -40,8 +40,8 @@ struct Cli {
     output_path: Option<String>,
 }
 
-const BALLS_INSERT_START: &str = "\n// balls-insert-start\n";
-const BALLS_INSERT_END: &str = "\n// balls-insert-end\n";
+const BALLS_INSERT_START: &str = "// balls-insert-start\n";
+const BALLS_INSERT_END: &str = "\n// balls-insert-end";
 
 fn splice_into_huff(path: &str, content_to_inject: String) -> Result<(), String> {
     let content =
