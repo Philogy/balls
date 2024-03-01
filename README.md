@@ -34,3 +34,53 @@ reasonable times for larger examples such as `permit_ma.balls`.
 
 Note that if the value is too low the scheduler may output a scheduling but it may not be the most
 optimal possible schedule.
+
+## Dependencies
+
+BALLS is able to search for and create optimal stack schedules by going through and reordering
+operations. To ensure that the code remains correct the system tracks "read" and "write"
+dependencies. Some dependencies are quite straight forward to understand like `MEMORY` and
+`STORAGE`. Having a "read" dependency means that you depend on it but that it does not matter in
+what order it gets accessed so long as it does not get changed, "write" means that it affects the
+dependency and that it's order has to remain fixed relative to other writes and to its preceding
+e.g.
+
+Original definition in code:
+```
+1. read A
+2. write A
+3. read A
+4. read A
+5. read A
+6. write A
+7. write A
+```
+
+Valid reordering:
+
+```diff
+1. read A
+2. write A
++ 5. read A
++ 4. read A
++ 3. read A
+6. write A
+7. write A
+```
+
+**Invalid** reordering:
+
+```diff
+1. read A
+- 3. read A
+- 2. write A
+4. read A
+5. read A
+- 7. write A
+- 6. write A
+```
+
+The list of default dependencies, opcodes and their read/writes can be found under
+[`src/transformer/std_evm.rs`](./src/transformer/std_evm.rs).
+
+
