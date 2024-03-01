@@ -146,7 +146,7 @@ fn main() {
             }
         }
 
-        println!("Lexing + parsing: {}", parse_lex_time.humanize_seconds());
+        println!("\nLexing + parsing: {}", parse_lex_time.humanize_seconds());
         for (name, tracker, preprocessing_time) in schedule_summaries {
             println!("{}:", name);
             println!(
