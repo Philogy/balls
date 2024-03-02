@@ -54,7 +54,6 @@ where
                             None => "Unexpected EOF",
                         },
                         err.expected()
-                            .into_iter()
                             .map(|expected| match expected {
                                 Some(s) => s,
                                 None => "<EOF>",
