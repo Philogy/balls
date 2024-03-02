@@ -150,7 +150,7 @@ pub fn format_with_stack_comments(
     out.push_str(&line);
     out.push('\n');
 
-    out.push_str("}");
+    out.push('}');
 
     out
 }

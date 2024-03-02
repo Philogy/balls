@@ -144,7 +144,7 @@ fn unspan<T: Clone + Debug>(spanned: &Vec<Spanned<T>>) -> Vec<T> {
 /// Graphs an expression object, transforming and creating nodes
 fn graph_expr(ctx: &mut SemanticContext, symbols: &Symbols, expr: &Expr) -> CompNodeId {
     match expr {
-        Expr::Var(ident) => ctx.get_with_symbols(symbols, &ident).unwrap_or_else(|| {
+        Expr::Var(ident) => ctx.get_with_symbols(symbols, ident).unwrap_or_else(|| {
             panic!(
                 "Encountered invalid identifier in IR gen ({}, {:?})",
                 ident, ctx.top_level_macro_args
@@ -315,7 +315,7 @@ pub fn gen_ir(
         .iter()
         .map(|output| {
             ctx.get_with_symbols(symbols, &output.inner)
-                .expect(format!("TODO: Undefined output identifer {:?}", output).as_str())
+                .unwrap_or_else(|| panic!("TODO: Undefined output identifer {:?}", output))
         })
         .collect();
 

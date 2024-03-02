@@ -23,7 +23,7 @@ pub fn get_actions<'a>(
         .collect();
 
     let total_stack_el = machine.stack.len();
-    let deepest_idx = total_stack_el.checked_sub(17).unwrap_or(0);
+    let deepest_idx = total_stack_el.saturating_sub(17);
 
     (deepest_idx..total_stack_el)
         .filter_map(move |i| {
@@ -49,11 +49,11 @@ pub fn get_actions<'a>(
                         id, machine.stack
                     )
                         });
-                        if idx < machine.stack.len().checked_sub(17).unwrap_or(0) {
+                        if idx < machine.stack.len().saturating_sub(17) {
                             None
                         } else {
                             let mut undos = vec![Action::UndoComp(id, idx, false)];
-                            if let Some(_) = &info.variants[id] {
+                            if info.variants[id].is_some() {
                                 undos.push(Action::UndoComp(id, idx, true));
                             }
                             Some(undos)

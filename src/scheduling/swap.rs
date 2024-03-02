@@ -16,7 +16,7 @@ impl<'a, T: Eq> Swapper<'a, T> {
         if from.len() != to.len() {
             panic!("length mismatch");
         }
-        if from.len() == 0 {
+        if from.is_empty() {
             panic!("Length 0");
         }
         let incorrect_indices = (0..to.len() - 1).filter(|i| from[*i] != to[*i]).collect();
@@ -35,7 +35,7 @@ impl<'a, T: Eq> Swapper<'a, T> {
 
     pub fn done(&self) -> bool {
         let last_idx = self.to.len() - 1;
-        self.incorrect_indices.len() == 0 && self.from[last_idx] == self.to[last_idx]
+        self.incorrect_indices.is_empty() && self.from[last_idx] == self.to[last_idx]
     }
 
     pub fn peek_next_swap(&self) -> Option<(usize, bool)> {
@@ -45,9 +45,7 @@ impl<'a, T: Eq> Swapper<'a, T> {
         if last != &self.to[last_idx] {
             let (swap_to_idx, _) = zip(self.from.iter(), self.to)
                 .enumerate()
-                .take(last_idx)
-                .filter(|(_, (x, y))| x != y && *y == last)
-                .next()?;
+                .take(last_idx).find(|(_, (x, y))| x != y && *y == last)?;
             return Some((swap_to_idx, true));
         }
 
@@ -65,7 +63,7 @@ impl<'a, T: Eq> Swapper<'a, T> {
 
     pub fn get_swaps(&mut self) -> Vec<usize> {
         let mut swaps = vec![];
-        while let Some(depth) = self.next() {
+        for depth in self.by_ref() {
             swaps.push(depth);
         }
         swaps
