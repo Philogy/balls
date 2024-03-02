@@ -11,7 +11,7 @@ pub fn print_errors<'a, 'b, F>(
 where
     F: FnMut(&Span) -> Span,
 {
-    let errored = errs.len() > 0;
+    let errored = !errs.is_empty();
 
     errs.into_iter()
         .map(|err| err.map(|tok| tok.to_string()))
