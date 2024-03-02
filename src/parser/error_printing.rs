@@ -2,9 +2,9 @@ use crate::parser::{tokens::Token, types::Span};
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::error::{Simple, SimpleReason};
 
-pub fn print_errors<'a, 'b, F>(
-    src: &'a str,
-    file_path: &'b str,
+pub fn print_errors<F>(
+    src: &str,
+    file_path: &str,
     errs: Vec<Simple<Token>>,
     mut token_span_resolver: F,
 ) -> bool
