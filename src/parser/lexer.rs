@@ -94,6 +94,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .then_ignore(end())
 }
 
-pub fn lex<'a>(source: &'a str) -> Result<Vec<Spanned<Token>>, Vec<Simple<char>>> {
+pub fn lex(source: &str) -> Result<Vec<Spanned<Token>>, Vec<Simple<char>>> {
     lexer().parse(source)
 }

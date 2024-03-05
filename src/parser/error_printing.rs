@@ -2,16 +2,16 @@ use crate::parser::{tokens::Token, types::Span};
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use chumsky::error::{Simple, SimpleReason};
 
-pub fn print_errors<'a, 'b, F>(
-    src: &'a str,
-    file_path: &'b str,
+pub fn print_errors<F>(
+    src: &str,
+    file_path: &str,
     errs: Vec<Simple<Token>>,
     mut token_span_resolver: F,
 ) -> bool
 where
     F: FnMut(&Span) -> Span,
 {
-    let errored = errs.len() > 0;
+    let errored = !errs.is_empty();
 
     errs.into_iter()
         .map(|err| err.map(|tok| tok.to_string()))
@@ -29,7 +29,7 @@ where
                         delimiter.fg(Color::Yellow)
                     ))
                     .with_label(
-                        Label::new((&file_path, token_span_resolver(&span)))
+                        Label::new((&file_path, token_span_resolver(span)))
                             .with_message(format!(
                                 "Unclosed delimiter {}",
                                 delimiter.fg(Color::Yellow)
@@ -54,7 +54,6 @@ where
                             None => "Unexpected EOF",
                         },
                         err.expected()
-                            .into_iter()
                             .map(|expected| match expected {
                                 Some(s) => s,
                                 None => "<EOF>",

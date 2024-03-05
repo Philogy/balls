@@ -174,7 +174,7 @@ fn validate_expression(
                                 expr.span.clone(),
                             ));
                         }
-                        if macro_args.inner.len() != 0 {
+                        if !macro_args.inner.is_empty() {
                             errors.push(SemanticError::CallArgumentMismatch(
                                 0,
                                 macro_args.inner.len(),
@@ -279,7 +279,7 @@ fn validate_expression(
                     func,
                     top_level_symbols,
                     local_symbols,
-                    &stack_arg,
+                    stack_arg,
                     true,
                     errors,
                 );
@@ -290,7 +290,7 @@ fn validate_expression(
                 .macro_args
                 .iter()
                 .any(|macro_arg| macro_arg.inner == *ident)
-                && !local_symbols.contains(&ident)
+                && !local_symbols.contains(ident)
                 && !matches!(
                     top_level_symbols.get(ident),
                     Some(Spanned {
@@ -315,7 +315,7 @@ fn validate_func(symbols: &Symbols, func: &Function) -> Vec<SemanticError> {
     let func_args: Vec<_> = func
         .macro_args
         .iter()
-        .chain(func.inputs.iter().map(|input| input))
+        .chain(func.inputs.iter())
         .collect();
 
     errors.extend(check_duplicate_identifiers("function argument", &func_args));
@@ -371,14 +371,12 @@ pub fn validate_and_get_symbols(nodes: Vec<Spanned<Ast>>) -> Result<Symbols, Vec
 
     let (std_deps, std_ops) = get_standard_opcodes_and_deps();
     for dep in std_deps {
-        symbols
-            .insert(dep.into(), Spanned::new(Symbol::Dependency, 0..0))
-            .map(|_| panic!("Duplicate symbol from std_lib"));
+        if symbols
+            .insert(dep.into(), Spanned::new(Symbol::Dependency, 0..0)).is_some() { panic!("Duplicate symbol from std_lib") }
     }
     for op in &std_ops {
-        symbols
-            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op.clone()), 0..0))
-            .map(|_| panic!("Duplicate symbol from std_lib"));
+        if symbols
+            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op.clone()), 0..0)).is_some() { panic!("Duplicate symbol from std_lib") }
     }
     for op in std_ops {
         if let Some((other_ident, _)) = &op.other {
@@ -434,7 +432,7 @@ pub fn validate_and_get_symbols(nodes: Vec<Spanned<Ast>>) -> Result<Symbols, Vec
         }
     }));
 
-    if errors.len() == 0 {
+    if errors.is_empty() {
         Ok(symbols)
     } else {
         Err(errors)

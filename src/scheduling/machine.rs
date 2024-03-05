@@ -28,7 +28,7 @@ pub struct BackwardsMachine {
     /// "done".
     pub blocked_by: Vec<Option<u32>>,
 }
-
+#[allow(clippy::derive_ord_xor_partial_ord)]
 impl Ord for BackwardsMachine {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.stack
@@ -72,7 +72,7 @@ impl BackwardsMachine {
 
         let at_end = self.all_done();
         if at_end {
-            if self.stack.len() == 0 {
+            if self.stack.is_empty() {
                 debug_assert_eq!(
                     info.target_input_stack.len(),
                     0,
