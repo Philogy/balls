@@ -297,7 +297,7 @@ pub fn get_standard_opcodes_and_deps() -> (Vec<&'static str>, Vec<Op>) {
         ////////////////////////////////////////////////////////////////,
         Op::new("stop", 0, false, vec![], vec!["CONTROL_FLOW"]),
         Op::new("return", 2, false, vec!["MEMORY"], vec!["CONTROL_FLOW"]),
-        Op::new("revert", 2, false, vec!["CONTROL_FLOW"], vec![]),
+        Op::new("revert", 2, false, vec!["MEMORY", "CONTROL_FLOW"], vec![]),
         Op::new("invalid", 0, false, vec!["CONTROL_FLOW"], vec![]),
         Op::new(
             "selfdestruct",
