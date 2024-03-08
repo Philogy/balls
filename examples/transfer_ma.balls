@@ -2,7 +2,7 @@
 extern _REQUIRE_NOT() stack(1, 0) reads(CONTROL_FLOW)
 
 // Define actual code
-fn TRANSFER(z0) [error] -> [] {
+fn TRANSFER<z0>(error) -> () {
     // Define some variables
     to = calldataload(0x04)
     amount = calldataload(0x24)
@@ -29,10 +29,11 @@ fn TRANSFER(z0) [error] -> [] {
     return(z0, msize())
 }
 
-fn BALANCE_OF(z0) [error] -> [] {
+fn BALANCE_OF<z0>(error) -> () {
     _REQUIRE_NOT(error)
     owner = calldataload(0x04)
     bal = sload(owner)
     mstore(z0, bal)
     return(z0, msize())
 }
+

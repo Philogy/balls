@@ -278,7 +278,9 @@ pub fn gen_ir(
             .collect(),
     );
 
-    // Verify that there are no duplicate input identifiers and create nodes.
+    // Verify that there are no duplicate input identifiers and create nodes. Also reverse IDs so
+    // that they are in the right order for the stack (syntax interpreted as left-to-right
+    // top-to-bottom).
     let input_ids: Vec<_> = func
         .inputs
         .iter()
@@ -290,6 +292,7 @@ pub fn gen_ir(
             ctx.set_ident(ident.clone(), id);
             id
         })
+        .rev()
         .collect();
 
     // Assign IDs to statements.

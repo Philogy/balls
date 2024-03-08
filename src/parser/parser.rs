@@ -179,16 +179,26 @@ fn function_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
     // fn TRANSFER
     let macro_def = just(Token::Fn).ignore_then(ident());
 
-    // (arg1, arg2, ...)
-    let macro_args = recover_for_round_delimited(ident().map_with_span(Spanned::new).list());
+    // <arg1, arg2, ...>
+    let macro_args = ident()
+        .map_with_span(Spanned::new)
+        .list()
+        .delimited_by(just(Token::OpenAngle), just(Token::CloseAngle))
+        .or_default();
+
+    // (stack_in1, stack_in2, stack_in3,...)
+    let stack_in = recover_for_round_delimited(ident().map_with_span(Spanned::new).list());
+
+    // -> (a, b, c)
+    let stack_out = just(Token::Arrow)
+        .ignore_then(recover_for_round_delimited(
+            ident().map_with_span(Spanned::new).list(),
+        ))
+        .or_not()
+        .map(|x| x.unwrap_or(Ok(vec![])));
 
     // reads(...) writes(...)
     let reads_writes = dependency_list(Token::Reads).then(dependency_list(Token::Writes));
-
-    // [a, b, c] -> [d, e]
-    let stack_in_out = stack_parameters()
-        .then_ignore(just(Token::Arrow))
-        .then(stack_parameters().or_default());
 
     // { var1 = op(a, ...) ... sstore(x, y)  }
     let body = statement()
@@ -197,26 +207,26 @@ fn function_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {
 
     macro_def
         .then(macro_args)
+        .then(stack_in)
+        .then(stack_out)
         .then(reads_writes)
-        .then(stack_in_out)
         .then(body)
         .map(
-            |((((ident, maybe_macro_args), (reads, writes)), (inputs, outputs)), body)| {
-                maybe_macro_args
-                    .map(|macro_args| {
-                        Ast::Function(Function {
-                            ident,
-                            macro_args,
-                            inputs,
-                            outputs,
-                            body,
-                            reads,
-                            writes,
-                        })
-                    })
-                    .unwrap_or(Ast::Error)
+            |(((((ident, macro_args), maybe_inputs), maybe_outputs), (reads, writes)), body)| {
+                let inputs = maybe_inputs?;
+                let outputs = maybe_outputs?;
+                Ok::<Ast, ()>(Ast::Function(Function {
+                    ident,
+                    macro_args,
+                    inputs,
+                    outputs,
+                    body,
+                    reads,
+                    writes,
+                }))
             },
         )
+        .map(|maybe_ast: Result<Ast, _>| maybe_ast.unwrap_or(Ast::Error))
 }
 
 fn extern_huff_macro_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {

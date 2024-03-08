@@ -109,9 +109,8 @@ fn main() {
                 _ => None,
             })
             .map(|func| {
-                let (ir_graph, value_sources, assignments) = gen_ir(func, &symbols);
-
                 let start = Instant::now();
+                let (ir_graph, value_sources, assignments) = gen_ir(func, &symbols);
                 let preprocessing_time = start.elapsed().as_secs_f64();
 
                 let (steps, tracker) = if args.dijkstra {

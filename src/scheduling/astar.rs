@@ -175,10 +175,10 @@ pub trait AStarScheduler: Sized {
         let mut queue: ScheduleQueue = BinaryHeap::new();
         let info = ScheduleInfo::from(graph);
         let start = BackwardsMachine::new(
-            graph.output_ids.clone(),
+            graph.output_ids.iter().rev().cloned().collect(),
             graph.nodes.iter().map(|node| node.blocked_by).collect(),
         );
-        let est_capacity = self.estimate_explored_map_size(info, &start);
+        let est_capacity = self.estimate_explored_map_size(info, &start, max_stack_depth);
         let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Default::default());
 
@@ -194,7 +194,7 @@ pub trait AStarScheduler: Sized {
 
         // 1. Pop top of priority queue (node closest to end according to actual cost + estimated
         //    remaining distance).
-        while let Some(node) = queue.pop() {
+        while let Some(mut node) = queue.pop() {
             let came_from = hasher.hash_one_off(&node.state);
             // 2a. If the shortest node is the end we know we found our solution, accumulate the
             // steps and return.
@@ -205,6 +205,11 @@ pub trait AStarScheduler: Sized {
                     all_steps.extend(e.steps.into_iter().rev());
                     state_key = e.came_from;
                 }
+
+                let mut final_swaps = vec![];
+                node.state.swap_to_target(info, &mut final_swaps).unwrap();
+                final_swaps.reverse();
+                all_steps.extend(final_swaps);
 
                 let explored_size = explored.len();
 
@@ -261,9 +266,11 @@ pub trait AStarScheduler: Sized {
         &mut self,
         _info: ScheduleInfo,
         start_state: &BackwardsMachine,
+        max_stack_depth: usize,
     ) -> usize {
         let blocks = start_state.total_blocked() as usize;
-        blocks * blocks * 30
+        // blocks * max_stack_depth * max_stack_depth * 3
+        19_000_000
     }
 
     fn estimate_remaining_cost(

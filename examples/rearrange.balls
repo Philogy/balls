@@ -1,0 +1,3 @@
+fn DODO(a, c, b) -> (c, b, a) {
+    mstore(wow, nice)
+}

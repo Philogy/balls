@@ -72,27 +72,36 @@ impl BackwardsMachine {
 
         let at_end = self.all_done();
         if at_end {
-            if self.stack.is_empty() {
-                debug_assert_eq!(
-                    info.target_input_stack.len(),
-                    0,
-                    "Ended with a stack of size 0 but target_input_stack has a non-zero length"
-                );
-            } else {
-                let mut swapper = Swapper::new(&mut self.stack, info.target_input_stack);
-                for depth in swapper.get_swaps() {
-                    if depth > MAX_VALID_SWAP_DEPTH {
-                        return Err(format!("Invalid necessary swap depth: {}", depth));
-                    }
-                    steps.push(Step::Swap(depth));
-                }
-                assert!(
-                    swapper.matching_count().unwrap(),
-                    "Not-matching count according to swapper despite all_done => true"
-                );
-            }
+            self.swap_to_target(info, steps)?;
         }
         Ok(at_end)
+    }
+
+    pub fn swap_to_target(
+        &mut self,
+        info: ScheduleInfo,
+        steps: &mut Vec<Step>,
+    ) -> Result<(), String> {
+        if self.stack.len() == 0 {
+            debug_assert_eq!(
+                info.target_input_stack.len(),
+                0,
+                "Ended with a stack of size 0 but target_input_stack has a non-zero length"
+            );
+        } else {
+            let mut swapper = Swapper::new(&mut self.stack, info.target_input_stack);
+            for depth in swapper.get_swaps() {
+                if depth > MAX_VALID_SWAP_DEPTH {
+                    return Err(format!("Invalid necessary swap depth: {}", depth));
+                }
+                steps.push(Step::Swap(depth));
+            }
+            assert!(
+                swapper.matching_count().unwrap(),
+                "Not-matching count according to swapper despite all_done => true"
+            );
+        }
+        Ok(())
     }
 
     fn unpop(&mut self, info: ScheduleInfo, id: CompNodeId, steps: &mut Vec<Step>) {

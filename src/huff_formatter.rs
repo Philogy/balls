@@ -50,6 +50,7 @@ pub fn format_with_stack_comments(
     let mut stack: Vec<String> = func
         .inputs
         .iter()
+        .rev()
         .map(|spanned| spanned.inner.clone())
         .collect();
 

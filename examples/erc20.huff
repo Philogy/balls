@@ -1,9 +1,3 @@
-#define macro _REQUIRE_NOT() = takes(1) returns(0) {
-    iszero is_ok jumpi
-        0x0 0x0 revert
-    is_ok:
-}
-
 // balls-insert-start
 #define macro BALANCE_OF(z0) = takes(1) returns(0) {
     // takes:                      [error]
@@ -50,3 +44,14 @@
     // returns:                    []
 }
 // balls-insert-end
+
+#define macro _REQUIRE_NOT() = takes(1) returns(0) {
+    iszero is_ok jumpi
+        0x0 0x0 revert
+    is_ok:
+}
+
+#define macro _LOAD_ADDRESS(offset) = takes(0) returns(1) {
+    <offset> calldataload
+    0xc shr
+}
