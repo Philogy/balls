@@ -1,4 +1,3 @@
-
 use crate::scheduling::ir::CompNodeId;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo};
 use crate::Searchable;

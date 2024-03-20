@@ -1,0 +1,50 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [main]
+
+name: CI
+
+jobs:
+  clippy:
+    name: "clippy"
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CI }}
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          key: "clippy"
+      - name: "clippy all"
+        run: cargo clippy --workspace --lib --examples --tests --benches --all-features
+        env:
+          RUSTFLAGS: -D warnings
+
+  build:
+    name: "build and fmt"
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: "buildfmt"
+          cache-on-failure: true
+
+      - name: "build nightly"
+        run: cargo build --workspace --all-features
+        env:
+          RUSTFLAGS: -D warnings
+
+      - name: "cargo fmt"
+        run: cargo fmt --all --check
