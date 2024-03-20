@@ -190,13 +190,12 @@ pub trait AStarScheduler: Sized + Sync + Send {
             at_end: start.all_done(),
         });
 
-        let mut hasher = ahash::AHasher::default();
+        let mut hasher = FastHasher::new();
 
         // 1. Pop top of priority queue (node closest to end according to actual cost + estimated
         //    remaining distance).
         while let Some(mut node) = queue.pop() {
-            node.state.hash(&mut hasher);
-            let came_from = hasher.finish();
+            let came_from = hasher.hash_one_off(&node.state);
             // 2a. If the shortest node is the end we know we found our solution, accumulate the
             // steps and return.
             if node.at_end {
@@ -235,8 +234,7 @@ pub trait AStarScheduler: Sized + Sync + Send {
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 tracker.total_explored += 1;
-                new_state.hash(&mut hasher);
-                let new_state_hash = hasher.finish();
+                let new_state_hash = hasher.hash_one_off(&new_state);
 
                 let new_cost_better = match explored.get(&new_state_hash) {
                     Some(e) => new_cost < e.cost,

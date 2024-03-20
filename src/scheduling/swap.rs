@@ -45,7 +45,8 @@ impl<'a, T: Eq> Swapper<'a, T> {
         if last != &self.to[last_idx] {
             let (swap_to_idx, _) = zip(self.from.iter(), self.to)
                 .enumerate()
-                .take(last_idx).find(|(_, (x, y))| x != y && *y == last)?;
+                .take(last_idx)
+                .find(|(_, (x, y))| x != y && *y == last)?;
             return Some((swap_to_idx, true));
         }
 

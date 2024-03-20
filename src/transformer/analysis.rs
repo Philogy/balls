@@ -312,11 +312,7 @@ fn validate_expression(
 fn validate_func(symbols: &Symbols, func: &Function) -> Vec<SemanticError> {
     let mut errors = vec![];
 
-    let func_args: Vec<_> = func
-        .macro_args
-        .iter()
-        .chain(func.inputs.iter())
-        .collect();
+    let func_args: Vec<_> = func.macro_args.iter().chain(func.inputs.iter()).collect();
 
     errors.extend(check_duplicate_identifiers("function argument", &func_args));
 
@@ -372,11 +368,19 @@ pub fn validate_and_get_symbols(nodes: Vec<Spanned<Ast>>) -> Result<Symbols, Vec
     let (std_deps, std_ops) = get_standard_opcodes_and_deps();
     for dep in std_deps {
         if symbols
-            .insert(dep.into(), Spanned::new(Symbol::Dependency, 0..0)).is_some() { panic!("Duplicate symbol from std_lib") }
+            .insert(dep.into(), Spanned::new(Symbol::Dependency, 0..0))
+            .is_some()
+        {
+            panic!("Duplicate symbol from std_lib")
+        }
     }
     for op in &std_ops {
         if symbols
-            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op.clone()), 0..0)).is_some() { panic!("Duplicate symbol from std_lib") }
+            .insert(op.ident.clone(), Spanned::new(Symbol::Op(op.clone()), 0..0))
+            .is_some()
+        {
+            panic!("Duplicate symbol from std_lib")
+        }
     }
     for op in std_ops {
         if let Some((other_ident, _)) = &op.other {
