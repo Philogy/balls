@@ -1,4 +1,3 @@
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::scheduling::ir::CompNodeId;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo};

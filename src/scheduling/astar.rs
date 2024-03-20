@@ -6,7 +6,6 @@ use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 use std::time::Instant;
-use xxhash_rust::xxh3::{Xxh3, Xxh3Builder};
 
 #[derive(Debug, Clone)]
 pub struct SchedulingTracker {
