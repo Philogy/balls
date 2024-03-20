@@ -226,46 +226,42 @@ pub trait AStarScheduler: Sized + Sync + Send {
 
             // 2b. Not at the end so we explore all possible neighbours.
             //
-            let queue_res = get_actions(info, &node.state)
-                .filter_map(|action| {
-                    let mut new_state = node.state.clone();
-                    let mut steps = Vec::with_capacity(30);
-                    let at_end = new_state.apply(info, action, &mut steps).unwrap();
-                    if new_state.stack.len() > max_stack_depth {
-                        return None;
-                    }
-                    let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
-                    tracker.total_explored += 1;
-                    new_state.hash(&mut hasher);
-                    let new_state_hash = hasher.finish();
+            queue.extend(get_actions(info, &node.state).filter_map(|action| {
+                let mut new_state = node.state.clone();
+                let mut steps = Vec::with_capacity(30);
+                let at_end = new_state.apply(info, action, &mut steps).unwrap();
+                if new_state.stack.len() > max_stack_depth {
+                    return None;
+                }
+                let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
+                tracker.total_explored += 1;
+                new_state.hash(&mut hasher);
+                let new_state_hash = hasher.finish();
 
-                    let new_cost_better = match explored.get(&new_state_hash) {
-                        Some(e) => new_cost < e.cost,
-                        None => true,
-                    };
-                    if new_cost_better {
-                        let out = explored.insert(
-                            new_state_hash,
-                            Explored {
-                                came_from,
-                                cost: new_cost,
-                                steps,
-                            },
-                        );
-                        tracker.total_collisions += if out.is_some() { 1 } else { 0 };
-                        let score =
-                            new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
-                        return Some(ScheduleNode {
-                            state: new_state,
+                let new_cost_better = match explored.get(&new_state_hash) {
+                    Some(e) => new_cost < e.cost,
+                    None => true,
+                };
+                if new_cost_better {
+                    let out = explored.insert(
+                        new_state_hash,
+                        Explored {
+                            came_from,
                             cost: new_cost,
-                            score,
-                            at_end,
-                        });
-                    }
-                    None
-                })
-                .collect::<Vec<_>>();
-            queue.extend(queue_res);
+                            steps,
+                        },
+                    );
+                    tracker.total_collisions += if out.is_some() { 1 } else { 0 };
+                    let score = new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
+                    return Some(ScheduleNode {
+                        state: new_state,
+                        cost: new_cost,
+                        score,
+                        at_end,
+                    });
+                }
+                None
+            }));
         }
 
         panic!("TODO: Impossible to schedule within specified bounds (likely stack-too-deep).")
