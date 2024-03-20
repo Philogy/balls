@@ -20,7 +20,7 @@ impl MacroArg {
     pub fn balls_repr(&self) -> String {
         match self {
             Self::Num(num) => format!("0x{:x}", num),
-            Self::ArgRef(ident) => format!("{}", ident),
+            Self::ArgRef(ident) => ident.to_string(),
         }
     }
 }

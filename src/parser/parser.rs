@@ -161,18 +161,11 @@ fn statement() -> impl Parser<Token, Statement, Error = Simple<Token>> {
             if stated.ident.is_none() && !matches!(stated.expr.inner, Expr::Call { .. }) {
                 emit(Simple::custom(
                     span,
-                    format!("Top-level expression not allowed"),
+                    "Top-level expression not allowed".to_string(),
                 ))
             }
             stated
         })
-}
-
-fn stack_parameters() -> impl Parser<Token, Vec<Spanned<String>>, Error = Simple<Token>> {
-    ident()
-        .map_with_span(Spanned::new)
-        .list()
-        .delimited_by(just(Token::OpenSquare), just(Token::CloseSquare))
 }
 
 fn function_definition() -> impl Parser<Token, Ast, Error = Simple<Token>> {

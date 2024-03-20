@@ -29,9 +29,9 @@ pub enum Token {
     Assign,
 }
 
-impl Into<String> for Token {
-    fn into(self) -> String {
-        format!("{}", self)
+impl From<Token> for String {
+    fn from(val: Token) -> Self {
+        format!("{}", val)
     }
 }
 

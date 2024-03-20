@@ -390,7 +390,7 @@ pub fn validate_and_get_symbols(nodes: Vec<Spanned<Ast>>) -> Result<Symbols, Vec
                     ..
                 }) => {
                     assert!(
-                        op.stack_in == other_op.stack_in && op.stack_out == op.stack_out,
+                        op.stack_in == other_op.stack_in && op.stack_out == other_op.stack_out,
                         "Mismatching variant op in std_ops {:?} vs. {:?}",
                         op,
                         other_op

@@ -12,11 +12,6 @@ chumsky = "0.9.3"
 clap = { version = "4.5.1", features = ["derive"] }
 num-bigint = "0.4.4"
 
-
-[dependencies.xxhash-rust]
-version = "0.8.8"
-features = ["xxh3", "const_xxh3"]
-
 [lib]
 path = "src/lib.rs"
 

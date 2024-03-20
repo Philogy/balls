@@ -82,7 +82,7 @@ impl BackwardsMachine {
         info: ScheduleInfo,
         steps: &mut Vec<Step>,
     ) -> Result<(), String> {
-        if self.stack.len() == 0 {
+        if self.stack.is_empty() {
             debug_assert_eq!(
                 info.target_input_stack.len(),
                 0,

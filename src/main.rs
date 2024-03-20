@@ -45,7 +45,7 @@ const BALLS_INSERT_END: &str = "\n// balls-insert-end";
 
 fn splice_into_huff(path: &str, content_to_inject: String) -> Result<(), String> {
     let content =
-        std::fs::read_to_string(&path).map_err(|_| format!("Failed to read file {}", path))?;
+        std::fs::read_to_string(path).map_err(|_| format!("Failed to read file {}", path))?;
     let start_index = content
         .find(BALLS_INSERT_START)
         .ok_or(format!("Could not find \"{}\"", BALLS_INSERT_START))?
@@ -61,7 +61,7 @@ fn splice_into_huff(path: &str, content_to_inject: String) -> Result<(), String>
         &content[end_index..]
     );
 
-    std::fs::write(&path, new_content).map_err(|_| format!("Failed to write file {}", path))?;
+    std::fs::write(path, new_content).map_err(|_| format!("Failed to write file {}", path))?;
 
     Ok(())
 }
@@ -88,7 +88,7 @@ fn main() {
 
     let (maybe_ast_nodes, errs) = parser::parse_tokens(tokens.clone());
 
-    let errored = print_errors(&src, &file_path, errs, |tok_span| {
+    let errored = print_errors(&src, file_path, errs, |tok_span| {
         resolve_span_span(tok_span, &spanned_tokens)
     });
 
