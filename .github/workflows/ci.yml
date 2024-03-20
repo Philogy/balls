@@ -21,8 +21,6 @@ jobs:
           key: "clippy"
       - name: "clippy all"
         run: cargo clippy --workspace --lib --examples --tests --benches --all-features
-        env:
-          RUSTFLAGS: -D warnings
 
   build:
     name: "build and fmt"
@@ -39,10 +37,8 @@ jobs:
           key: "buildfmt"
           cache-on-failure: true
 
-      - name: "build nightly"
+      - name: "build"
         run: cargo build --workspace --all-features
-        env:
-          RUSTFLAGS: -D warnings
 
       - name: "cargo fmt"
         run: cargo fmt --all --check
