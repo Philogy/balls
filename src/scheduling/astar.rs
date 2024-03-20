@@ -131,21 +131,10 @@ pub struct Explored {
 type ExploredMap = HashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
 type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
-struct FastHasher(ahash::AHasher);
-
-impl FastHasher {
-    fn new() -> Self {
-        Self(ahash::AHasher::default())
-    }
-
-    fn hash_one_off<T: Hash>(&mut self, value: &T) -> u64 {
-        let buf = &mut self.0 as *mut ahash::AHasher as *mut u64;
-        unsafe { *buf = 0 };
-
-        value.hash(&mut self.0);
-        
-        self.0.finish()
-    }
+fn hash_one_off<T: Hash>(value: &T) -> u64 {
+    let mut hashooor = ahash::AHasher::default();
+    value.hash(&mut hashooor);
+    hashooor.finish()
 }
 
 #[derive(Clone, Debug, Default)]
@@ -191,12 +180,10 @@ pub trait AStarScheduler: Sized + Sync + Send {
             at_end: start.all_done(),
         });
 
-        let mut hasher = FastHasher::new();
-
         // 1. Pop top of priority queue (node closest to end according to actual cost + estimated
         //    remaining distance).
         while let Some(mut node) = queue.pop() {
-            let came_from = hasher.hash_one_off(&node.state);
+            let came_from = hash_one_off(&node.state);
             // 2a. If the shortest node is the end we know we found our solution, accumulate the
             // steps and return.
             if node.at_end {
@@ -235,13 +222,13 @@ pub trait AStarScheduler: Sized + Sync + Send {
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 tracker.total_explored += 1;
-                let new_state_hash = hasher.hash_one_off(&new_state);
+                let new_state_hash = hash_one_off(&new_state);
 
-                let new_cost_better = match explored.get(&new_state_hash) {
+                match explored.get(&new_state_hash) {
                     Some(e) => new_cost < e.cost,
                     None => true,
-                };
-                if new_cost_better {
+                }
+                .then(|| {
                     let out = explored.insert(
                         new_state_hash,
                         Explored {
@@ -252,14 +239,13 @@ pub trait AStarScheduler: Sized + Sync + Send {
                     );
                     tracker.total_collisions += if out.is_some() { 1 } else { 0 };
                     let score = new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
-                    return Some(ScheduleNode {
+                    ScheduleNode {
                         state: new_state,
                         cost: new_cost,
                         score,
                         at_end,
-                    });
-                }
-                None
+                    }
+                })
             }));
         }
 

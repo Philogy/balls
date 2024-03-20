@@ -126,18 +126,18 @@ impl SemanticContext {
 
     /// Returns the IDs of the nodes that the newly inserted node is now dependent on (non-operand
     /// semantic dependency).
-    pub fn record_write(&mut self, dependency: &String, id: CompNodeId) {
+    pub fn record_write(&mut self, dependency: &str, id: CompNodeId) {
         let mut pre_deps = self
             .last_reads
-            .insert(dependency.clone(), Vec::new())
+            .insert(dependency.to_string(), Vec::new())
             .unwrap_or_default();
-        pre_deps.extend(self.last_write.insert(dependency.clone(), id));
+        pre_deps.extend(self.last_write.insert(dependency.to_string(), id));
 
         self.nodes_sources[id].0.post.extend(pre_deps);
     }
 }
 
-fn unspan<T: Clone + Debug>(spanned: &Vec<Spanned<T>>) -> Vec<T> {
+fn unspan<T: Clone + Debug>(spanned: &[Spanned<T>]) -> Vec<T> {
     spanned.iter().map(Spanned::unwrap_ref).cloned().collect()
 }
 
@@ -235,7 +235,7 @@ fn set_blocked_count(input_ids: &[CompNodeId], output_ids: &[CompNodeId], nodes:
     let total = nodes.len();
 
     let mut blocked_by = vec![0u32; total];
-    let mut stack_count = vec![0u32; total];
+    let mut stack_counts = vec![0u32; total];
 
     for node in nodes.iter() {
         for post_id in node.post.iter() {
@@ -244,23 +244,22 @@ fn set_blocked_count(input_ids: &[CompNodeId], output_ids: &[CompNodeId], nodes:
         for dep_id in node.operands.iter() {
             blocked_by[*dep_id] += 1;
             // Blocked once as an argument.
-            stack_count[*dep_id] += 1;
+            stack_counts[*dep_id] += 1;
         }
     }
 
     for output_id in output_ids.iter() {
-        stack_count[*output_id] += 1;
+        stack_counts[*output_id] += 1;
     }
 
     for id in 0..total {
-        let required_dedups = stack_count[id].max(1) - 1;
+        let required_dedups = stack_counts[id].max(1) - 1;
         *nodes[id].blocked_by.as_mut().unwrap() += required_dedups + blocked_by[id];
     }
 
-    for id in 0..total {
-        if nodes[id].blocked_by.unwrap() == 0 && input_ids.contains(&id) && output_ids.contains(&id)
-        {
-            nodes[id].blocked_by = None;
+    for (id, node) in nodes.iter_mut().enumerate() {
+        if node.blocked_by.unwrap() == 0 && input_ids.contains(&id) && output_ids.contains(&id) {
+            node.blocked_by = None;
         }
     }
 }
