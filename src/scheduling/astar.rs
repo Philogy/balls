@@ -140,10 +140,11 @@ impl FastHasher {
     }
 
     fn hash_one_off<T: Hash>(&mut self, value: &T) -> u64 {
-        let mut hasher = ahash::AHasher::default();
-        value.hash(&mut hasher);
-        let hash = hasher.finish();
-        // self.0.reset();
+        let buf = &mut self.0 as *mut ahash::AHasher as *mut u64;
+        unsafe { *buf = 0 };
+
+        value.hash(&mut self.0);
+        let hash = self.0.finish();
         hash
     }
 }
