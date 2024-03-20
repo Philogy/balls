@@ -26,6 +26,7 @@ pub fn get_actions<'a>(
     let deepest_idx = total_stack_el.saturating_sub(17);
 
     (deepest_idx..total_stack_el)
+        .into_iter()
         .filter_map(move |i| {
             (deepest_idx..total_stack_el).find_map(|j| {
                 if i != j && machine.stack[i] == machine.stack[j] {
@@ -38,6 +39,7 @@ pub fn get_actions<'a>(
         .chain(unpoppable.clone().into_iter().map(Action::Unpop))
         .chain(
             (0..info.nodes.len())
+                .into_iter()
                 .filter_map(move |id| {
                     if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
                         return None;

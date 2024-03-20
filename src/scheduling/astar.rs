@@ -6,7 +6,6 @@ use crate::TimeDelta;
 use std::collections::{BinaryHeap, HashMap};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 use std::time::Instant;
-use xxhash_rust::xxh3::{Xxh3, Xxh3Builder};
 
 #[derive(Debug, Clone)]
 pub struct SchedulingTracker {
@@ -132,17 +131,19 @@ pub struct Explored {
 type ExploredMap = HashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
 type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
-struct FastHasher(Xxh3);
+struct FastHasher(ahash::AHasher);
 
 impl FastHasher {
     fn new() -> Self {
-        Self(Xxh3Builder::new().build())
+        Self(ahash::AHasher::default())
     }
 
     fn hash_one_off<T: Hash>(&mut self, value: &T) -> u64 {
+        let buf = &mut self.0 as *mut ahash::AHasher as *mut u64;
+        unsafe { *buf = 0 };
+
         value.hash(&mut self.0);
         let hash = self.0.finish();
-        self.0.reset();
         hash
     }
 }
@@ -164,7 +165,7 @@ impl Hasher for NoopHasher {
     }
 }
 
-pub trait AStarScheduler: Sized {
+pub trait AStarScheduler: Sized + Sync + Send {
     fn schedule(
         mut self,
         graph: &IRGraph,
@@ -172,13 +173,13 @@ pub trait AStarScheduler: Sized {
     ) -> (Vec<Step>, SchedulingTracker) {
         let mut tracker = SchedulingTracker::default();
 
-        let mut queue: ScheduleQueue = BinaryHeap::new();
         let info = ScheduleInfo::from(graph);
         let start = BackwardsMachine::new(
             graph.output_ids.iter().rev().cloned().collect(),
             graph.nodes.iter().map(|node| node.blocked_by).collect(),
         );
         let est_capacity = self.estimate_explored_map_size(info, &start, max_stack_depth);
+        let mut queue: ScheduleQueue = BinaryHeap::with_capacity(est_capacity);
         let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Default::default());
 
@@ -224,16 +225,18 @@ pub trait AStarScheduler: Sized {
             }
 
             // 2b. Not at the end so we explore all possible neighbours.
-            for action in get_actions(info, &node.state) {
+            //
+            queue.extend(get_actions(info, &node.state).filter_map(|action| {
                 let mut new_state = node.state.clone();
-                let mut steps = vec![];
+                let mut steps = Vec::with_capacity(30);
                 let at_end = new_state.apply(info, action, &mut steps).unwrap();
                 if new_state.stack.len() > max_stack_depth {
-                    continue;
+                    return None;
                 }
                 let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
                 tracker.total_explored += 1;
                 let new_state_hash = hasher.hash_one_off(&new_state);
+
                 let new_cost_better = match explored.get(&new_state_hash) {
                     Some(e) => new_cost < e.cost,
                     None => true,
@@ -249,14 +252,15 @@ pub trait AStarScheduler: Sized {
                     );
                     tracker.total_collisions += if out.is_some() { 1 } else { 0 };
                     let score = new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
-                    queue.push(ScheduleNode {
+                    return Some(ScheduleNode {
                         state: new_state,
                         cost: new_cost,
                         score,
                         at_end,
                     });
                 }
-            }
+                None
+            }));
         }
 
         panic!("TODO: Impossible to schedule within specified bounds (likely stack-too-deep).")
@@ -274,7 +278,7 @@ pub trait AStarScheduler: Sized {
     }
 
     fn estimate_remaining_cost(
-        &mut self,
+        &self,
         _info: ScheduleInfo,
         _state: &BackwardsMachine,
         _cost: u32,
