@@ -1,7 +1,6 @@
-
 extern _WOWIIEE(x, y, z) stack(3, 1) reads(CONTROL_FLOW) writes(STORAGE)
 
-fn FACTORY(z0) [] -> [result]{
+fn FACTORY<z0>() -> (result) {
     salt = calldataload(z0)
     code_size = sub(calldatasize(), 0x20)
     calldatacopy(z0, 0x20, code_size)

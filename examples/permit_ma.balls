@@ -5,7 +5,7 @@ extern _LOAD_ADDRESS(offset) stack(0, 1)
 extern _REQUIRE_NOT() stack(1, 0) reads(CONTROL_FLOW)
 extern _NONCES_SLOT()  stack(1, 1)
 
-fn PERMIT(z0) [error] -> [] {
+fn PERMIT<z0>(error) {
     // Load calldata.
     owner = _LOAD_ADDRESS<0x10>()
     spender = _LOAD_ADDRESS<0x30>()

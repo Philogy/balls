@@ -1,3 +1,4 @@
-fn DODO(a, c, b) -> (c, b, a) {
+fn DODO<wow, nice>(a, c, b) -> (c, x) {
     mstore(wow, nice)
+    x = add(a, b)
 }

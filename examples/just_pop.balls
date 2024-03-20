@@ -1,1 +1,1 @@
-#define macro JUST_POPPING = [a, b] -> {} -> [a]
+fn JUST_POPPING(a, b) -> (a) {}

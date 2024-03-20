@@ -1,3 +1,3 @@
-fn DUMB_ADD() [x, y] -> [z] {
+fn DUMB_ADD(x, y) -> (z) {
     z = gt(x, y)
 }

@@ -1,11 +1,11 @@
-fn MERKLE_START() [] -> [end_offset, start_offset, leaf] {
+fn MERKLE_START() -> (end_offset, start_offset, leaf) {
     leaf = calldataload(0x24)
     length = calldataload(0x64)
     start_offset = 0x84
     end_offset = add(start_offset, shl(5, length))
 }
 
-fn MERKLE_VERIFY_BODY() [end_ptr, cd_ptr, leaf] -> [end_ptr, cd_ptr', leaf'] {
+fn MERKLE_VERIFY_BODY(end_ptr, cd_ptr, leaf) -> (end_ptr, cd_ptr', leaf') {
     interm_node = calldataload(cd_ptr)
     scratch = shl(5, lt(interm_node, leaf))
     mstore(scratch, leaf)

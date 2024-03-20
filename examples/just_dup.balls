@@ -1,1 +1,1 @@
-#define macro DUP_STUFF = [a, b] -> {} -> [a, b, b]
+fn DUP_STUFF(a, b) -> (a, b, b) {}
