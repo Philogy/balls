@@ -132,17 +132,18 @@ pub struct Explored {
 type ExploredMap = HashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
 type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
-struct FastHasher(Xxh3);
+struct FastHasher(ahash::AHasher);
 
 impl FastHasher {
     fn new() -> Self {
-        Self(Xxh3Builder::new().build())
+        Self(ahash::AHasher::default())
     }
 
     fn hash_one_off<T: Hash>(&mut self, value: &T) -> u64 {
-        value.hash(&mut self.0);
-        let hash = self.0.finish();
-        self.0.reset();
+        let mut hasher = ahash::AHasher::default();
+        value.hash(&mut hasher);
+        let hash = hasher.finish();
+        // self.0.reset();
         hash
     }
 }
