@@ -15,7 +15,7 @@ pub enum Action {
 pub fn get_actions<'a>(
     info: ScheduleInfo<'a>,
     machine: &'a BackwardsMachine,
-) -> impl ParallelIterator<Item = Action> + 'a {
+) -> impl Iterator<Item = Action> + 'a {
     let unpoppable: Vec<_> = (0..info.nodes.len())
         .filter(|id| {
             machine.blocked_by[*id] == Some(0)
@@ -28,7 +28,7 @@ pub fn get_actions<'a>(
     let deepest_idx = total_stack_el.saturating_sub(17);
 
     (deepest_idx..total_stack_el)
-        .into_par_iter()
+        .into_iter()
         .filter_map(move |i| {
             (deepest_idx..total_stack_el).find_map(|j| {
                 if i != j && machine.stack[i] == machine.stack[j] {
@@ -38,10 +38,10 @@ pub fn get_actions<'a>(
                 }
             })
         })
-        .chain(unpoppable.clone().into_par_iter().map(Action::Unpop))
+        .chain(unpoppable.clone().into_iter().map(Action::Unpop))
         .chain(
             (0..info.nodes.len())
-                .into_par_iter()
+                .into_iter()
                 .filter_map(move |id| {
                     if machine.blocked_by[id] != Some(0) || unpoppable.contains(&id) {
                         return None;

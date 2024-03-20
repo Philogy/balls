@@ -3,9 +3,7 @@ use crate::scheduling::ir::IRGraph;
 use crate::scheduling::{BackwardsMachine, ScheduleInfo, Step};
 use crate::CommaSeparatable;
 use crate::TimeDelta;
-use dashmap::DashMap;
-use rayon::iter::ParallelIterator;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 use std::time::Instant;
 use xxhash_rust::xxh3::{Xxh3, Xxh3Builder};
@@ -131,7 +129,7 @@ pub struct Explored {
     cost: u32,
 }
 
-type ExploredMap = DashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
+type ExploredMap = HashMap<u64, Explored, BuildHasherDefault<NoopHasher>>;
 type ScheduleQueue = BinaryHeap<ScheduleNode>;
 
 struct FastHasher(Xxh3);
@@ -182,7 +180,7 @@ pub trait AStarScheduler: Sized + Sync + Send {
         );
         let est_capacity = self.estimate_explored_map_size(info, &start, max_stack_depth);
         let explored: ExploredMap =
-            DashMap::with_capacity_and_hasher(est_capacity, Default::default());
+            HashMap::with_capacity_and_hasher(est_capacity, Default::default());
 
         let score = self.estimate_remaining_cost(info, &start, 0);
         queue.push(ScheduleNode {
