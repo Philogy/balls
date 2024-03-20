@@ -5,7 +5,7 @@ pub struct Dijkstra;
 
 impl AStarScheduler for Dijkstra {
     fn estimate_remaining_cost(
-        &mut self,
+        &self,
         _info: ScheduleInfo,
         _state: &BackwardsMachine,
         _cost: u32,
@@ -25,7 +25,7 @@ impl Guessooor {
 
 impl AStarScheduler for Guessooor {
     fn estimate_remaining_cost(
-        &mut self,
+        &self,
         _info: ScheduleInfo,
         state: &BackwardsMachine,
         _cost: u32,
