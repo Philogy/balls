@@ -172,14 +172,14 @@ pub trait AStarScheduler: Sized + Sync + Send {
     ) -> (Vec<Step>, SchedulingTracker) {
         let mut tracker = SchedulingTracker::default();
 
-        let mut queue: ScheduleQueue = BinaryHeap::new();
         let info = ScheduleInfo::from(graph);
         let start = BackwardsMachine::new(
             graph.output_ids.iter().rev().cloned().collect(),
             graph.nodes.iter().map(|node| node.blocked_by).collect(),
         );
         let est_capacity = self.estimate_explored_map_size(info, &start, max_stack_depth);
-        let explored: ExploredMap =
+        let mut queue: ScheduleQueue = BinaryHeap::with_capacity(est_capacity);
+        let mut explored: ExploredMap =
             HashMap::with_capacity_and_hasher(est_capacity, Default::default());
 
         let score = self.estimate_remaining_cost(info, &start, 0);
@@ -203,8 +203,8 @@ pub trait AStarScheduler: Sized + Sync + Send {
                 let mut state_key = came_from;
                 let mut all_steps = vec![];
                 while let Some(e) = explored.remove(&state_key) {
-                    all_steps.extend(e.1.steps.into_iter().rev());
-                    state_key = e.1.came_from;
+                    all_steps.extend(e.steps.into_iter().rev());
+                    state_key = e.came_from;
                 }
 
                 let mut final_swaps = vec![];
@@ -228,7 +228,6 @@ pub trait AStarScheduler: Sized + Sync + Send {
             //
             let queue_res = get_actions(info, &node.state)
                 .filter_map(|action| {
-                    let mut hasher = ahash::AHasher::default();
                     let mut new_state = node.state.clone();
                     let mut steps = Vec::with_capacity(30);
                     let at_end = new_state.apply(info, action, &mut steps).unwrap();
@@ -236,7 +235,7 @@ pub trait AStarScheduler: Sized + Sync + Send {
                         return None;
                     }
                     let new_cost = node.cost + steps.iter().map(|step| step.cost()).sum::<u32>();
-                    // tracker.total_explored += 1;
+                    tracker.total_explored += 1;
                     new_state.hash(&mut hasher);
                     let new_state_hash = hasher.finish();
 
@@ -253,7 +252,7 @@ pub trait AStarScheduler: Sized + Sync + Send {
                                 steps,
                             },
                         );
-                        // tracker.total_collisions += if out.is_some() { 1 } else { 0 };
+                        tracker.total_collisions += if out.is_some() { 1 } else { 0 };
                         let score =
                             new_cost + self.estimate_remaining_cost(info, &new_state, new_cost);
                         return Some(ScheduleNode {
