@@ -255,12 +255,11 @@ pub trait AStarScheduler: Sized + Sync + Send {
     fn estimate_explored_map_size(
         &mut self,
         _info: ScheduleInfo,
-        _start_state: &BackwardsMachine,
-        _max_stack_depth: usize,
+        start_state: &BackwardsMachine,
+        max_stack_depth: usize,
     ) -> usize {
-        // let blocks = start_state.total_blocked() as usize;
-        // blocks * max_stack_depth * max_stack_depth * 3
-        19_000_000
+        let blocks = start_state.total_blocked() as usize;
+        blocks.pow(2) * max_stack_depth * 3
     }
 
     fn estimate_remaining_cost(
