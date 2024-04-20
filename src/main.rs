@@ -38,6 +38,13 @@ struct Cli {
 
     #[clap(short, long, help = "The path to which to write the output")]
     output_path: Option<String>,
+
+    #[clap(
+        short,
+        long,
+        help = "Whether or not to display additional performance information"
+    )]
+    verbose: bool,
 }
 
 const BALLS_INSERT_START: &str = "// balls-insert-start\n";
@@ -68,6 +75,8 @@ fn splice_into_huff(path: &str, content_to_inject: String) -> Result<(), String>
 
 fn main() {
     let args = Cli::parse();
+
+    let total = Instant::now();
 
     assert!(
         args.max_stack_depth <= 1024,
@@ -141,18 +150,28 @@ fn main() {
             None => println!("{}", full_balls),
             Some(output_path) => {
                 splice_into_huff(&output_path, full_balls).unwrap();
-                println!("✅ Successfully inserted result into {}\n", &output_path);
+                if args.verbose {
+                    println!("✅ Successfully inserted result into {}\n", &output_path);
+                }
             }
         }
 
-        println!("\nLexing + parsing: {}", parse_lex_time.humanize_seconds());
-        for (name, tracker, preprocessing_time) in schedule_summaries {
-            println!("{}:", name);
-            println!(
-                "  Macro pre-processing: {}",
-                preprocessing_time.humanize_seconds()
-            );
-            tracker.report(2);
+        if args.verbose {
+            println!("\nLexing + parsing: {}", parse_lex_time.humanize_seconds());
+            for (name, tracker, preprocessing_time) in schedule_summaries {
+                println!("{}:", name);
+                println!(
+                    "  Macro pre-processing: {}",
+                    preprocessing_time.humanize_seconds()
+                );
+                tracker.report(2);
+            }
         }
+
+        println!(
+            "✨ Done '{}' in {}",
+            args.file_path,
+            total.elapsed().as_secs_f64().humanize_seconds()
+        );
     }
 }
