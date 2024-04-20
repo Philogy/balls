@@ -9,6 +9,103 @@ doesn't map very well to assignments.
 
 ## Guide
 
+**Installation**
+1. Clone repo (`git clone https://github.com/Philogy/balls.git`)
+2. `cd balls`
+3. `cargo install --path .`
+
+**Run**
+
+`balls -h`
+
+## Example
+
+**ERC20 `transfer(address to, uint256 amount)` method**
+
+
+Code:
+
+```yul
+// EXTERNAL
+extern _REQUIRE_NOT() stack(1, 0) reads(CONTROL_FLOW)
+
+// Define actual code
+fn TRANSFER<z0>(error) -> () {
+    // Define some variables
+    to = calldataload(0x04)
+    amount = calldataload(0x24)
+
+    // Get from balance.
+    from_bal = sload(caller())
+
+    // Check from balance and error.
+    insufficient_bal = gt(amount, from_bal)
+    error' = or(insufficient_bal, error)
+    _REQUIRE_NOT(error')
+
+    // Update from balance.
+    new_from_bal = sub(from_bal, amount)
+    sstore(caller(), new_from_bal)
+
+    // Update to balance.
+    to_bal = sload(to)
+    new_to_bal = add(to_bal, amount)
+    sstore(to, new_to_bal)
+
+    // Return success (1).
+    mstore(z0, 1)
+    return(z0, msize())
+}
+```
+
+Compile with `balls ./examples/transfer_ma.balls -d` (`-d` tells BALLS to use the Dijkstra which is
+guaranteed to result in the optimal scheduling given the constraints).
+
+Result:
+
+
+```huff
+#define macro TRANSFER(z0) = takes(1) returns(0) {
+    // takes:                      [error]
+    caller                      // [error, caller()]
+    sload                       // [error, from_bal]
+    0x24                        // [error, from_bal, 0x24]
+    calldataload                // [error, from_bal, amount]
+    dup1                        // [error, from_bal, amount, amount]
+    dup3                        // [error, from_bal, amount, amount, from_bal]
+    sub                         // [error, from_bal, amount, new_from_bal]
+    caller                      // [error, from_bal, amount, new_from_bal, caller()]
+    sstore                      // [error, from_bal, amount]
+    0x4                         // [error, from_bal, amount, 0x4]
+    calldataload                // [error, from_bal, amount, to]
+    dup1                        // [error, from_bal, amount, to, to]
+    sload                       // [error, from_bal, amount, to, to_bal]
+    dup3                        // [error, from_bal, amount, to, to_bal, amount]
+    add                         // [error, from_bal, amount, to, new_to_bal]
+    swap1                       // [error, from_bal, amount, new_to_bal, to]
+    sstore                      // [error, from_bal, amount]
+    gt                          // [error, insufficient_bal]
+    or                          // [error']
+    _REQUIRE_NOT()              // []
+    0x1                         // [0x1]
+    <z0>                        // [0x1, z0]
+    mstore                      // []
+    msize                       // [msize()]
+    <z0>                        // [msize(), z0]
+    return                      // []
+    // returns:                    []
+}
+```
+
+What this code does on a high-level:
+- Expects an external huff macro `_REQUIRE_NOT` that takes 0 inlined arguments, consumes 1 stack
+    value and pushes 0 values, that's dependent on the `CONTROL_FLOW` dependency meaning that it
+    shouldn't be rearranged after e.g. a `stop`, `revert` or `return`
+- Defines a Huff macro `TRANSFER` that takes 1 inlined argument `z0` and pops 1 stack value
+  referencing it as `"error"`
+
+## Extra Tips
+
 **Default**
 
 By default BALLS will run using the "Guessoor" scheduling algorithm, it runs quite quickly even on

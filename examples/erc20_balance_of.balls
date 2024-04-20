@@ -1,0 +1,8 @@
+fn BALANCE_OF<z0>(error) -> () {
+    _REQUIRE_NOT(error)
+    owner = calldataload(0x04)
+    bal = sload(owner)
+    mstore(z0, bal)
+    return(z0, msize())
+}
+
