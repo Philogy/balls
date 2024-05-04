@@ -1,0 +1,31 @@
+// Simple math example in BALLs
+
+extern _TERNARY() stack(3, 1)
+/** define _TERNARY macro in you huff output
+#define macro _TERNARY() = takes (3) returns (1) {
+    // input stack:     // [condition, true_value, false_value]
+    Jpm_TERNARY_is_zero jumpi
+
+    swap1               // [true_value, condition, false_value]
+    pop                 // [true_value]
+
+    Jpm_TERNARY_is_zero:
+    pop
+}
+*/
+
+fn MAX(num1, num2) -> (ret) {
+    ret = _TERNARY(gt(num1, num2), num1, num2)    
+}
+
+fn MIN(num1, num2) -> (ret) {
+    ret = _TERNARY(lt(num1, num2), num1, num2)    
+}
+
+/// @notice Returns the average of two values on the stack
+fn AVG(num1, num2) -> (avg) {
+    avg = add(
+        and(num1, num2),
+        div(xor(num2, num1), 2)
+    )
+}
