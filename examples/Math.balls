@@ -1,0 +1,24 @@
+// Simple math example in BALLs
+
+fn TERNARY(condition, true_value, false_value) -> (result) {
+    result = xor(
+        false_value,
+        mul(condition, xor(true_value, false_value))
+    )
+}
+
+fn MAX(num1, num2) -> (ret) {
+    ret = TERNARY(gt(num1, num2), num1, num2)    
+}
+
+fn MIN(num1, num2) -> (ret) {
+    ret = TERNARY(lt(num1, num2), num1, num2)    
+}
+
+/// @notice Returns the average of two values
+fn AVG(num1, num2) -> (avg) {
+    avg = add(
+        and(num1, num2),
+        div(xor(num2, num1), 2)
+    )
+}
