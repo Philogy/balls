@@ -1,0 +1,3 @@
+fn IS_COMMY(y, x) -> (z) {
+    z = gt(x, y)
+}
