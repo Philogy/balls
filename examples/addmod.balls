@@ -1,0 +1,3 @@
+fn HEY(x, y) -> (z) {
+    z = addmod(x, y, 3)
+}

@@ -258,12 +258,14 @@ impl BackwardsMachine {
         };
 
         if undoing_as_variant {
-            let operands: Vec<_> = info.nodes[id].operands.iter().rev().collect();
-            info.variants[id]
+            let variant = info.variants[id]
                 .as_ref()
-                .expect("undoing_as_variant flag without variant")
+                .expect("undoing_as_variant flag without variant");
+            let operands = &info.nodes[id].operands;
+            variant
                 .iter()
-                .for_each(|op_index| push_to_stack(operands[*op_index]));
+                .rev()
+                .for_each(|op_index| push_to_stack(&operands[*op_index]));
         } else {
             info.nodes[id].operands.iter().rev().for_each(push_to_stack);
         }
