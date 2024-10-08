@@ -11,21 +11,6 @@ fn text(
     just(literal).to(token).labelled(label)
 }
 
-fn keyword(literal: &'static str, token: Token) -> impl Parser<char, Token, Error = Simple<char>> {
-    text(literal, token, literal)
-}
-
-fn keywords() -> impl Parser<char, Token, Error = Simple<char>> {
-    keyword("op", Token::Op)
-        .or(keyword("dependency", Token::Dependency))
-        .or(keyword("fn", Token::Fn))
-        .or(keyword("stack", Token::Stack))
-        .or(keyword("reads", Token::Reads))
-        .or(keyword("writes", Token::Writes))
-        .or(keyword("extern", Token::External))
-        .or(keyword("const", Token::Const))
-}
-
 fn symbols() -> impl Parser<char, Token, Error = Simple<char>> {
     text("->", Token::Arrow, "arrow")
         .or(text("(", Token::OpenRound, "open round bracket"))
@@ -71,7 +56,16 @@ fn ident() -> impl Parser<char, Token, Error = Simple<char>> {
         )
         .chain::<char, Vec<_>, _>(filter(|c: &char| c == &'\'').repeated())
         .collect()
-        .map(Token::Ident)
+        .map(|name: String| match name.as_str() {
+            "dependency" => Token::Dependency,
+            "fn" => Token::Fn,
+            "stack" => Token::Stack,
+            "reads" => Token::Reads,
+            "writes" => Token::Writes,
+            "extern" => Token::External,
+            "const" => Token::Const,
+            _ => Token::Ident(name),
+        })
 }
 
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
@@ -84,7 +78,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .padded()
         .labelled("comment");
 
-    let token = keywords().or(symbols()).or(number()).or(ident());
+    let token = symbols().or(number()).or(ident());
 
     token
         .map_with_span(Spanned::new)
